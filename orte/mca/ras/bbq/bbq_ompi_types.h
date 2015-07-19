@@ -1,6 +1,8 @@
 #ifndef BBQ_TYPES
 #define BBQ_TYPES
 
+#define BBQ_CMD_FINISHED -2
+#define BBQ_CMD_NONE -1
 #define BBQ_CMD_NODES_REQUEST 0
 #define BBQ_CMD_NODES_REPLY 1
 
