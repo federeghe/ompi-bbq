@@ -37,11 +37,11 @@ static int recv_data(int fd, short args, void *cbdata);
 static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes);
 static int finalize(void);
 static int send_cmd(orte_job_t *jdata, int cmd);
-static int recv_nodes_reply();
-static void launch_job();
-static int recv_cmd();
+static int recv_nodes_reply(void);
+static void launch_job(void);
+static int recv_cmd(void);
 static int send_cmd_node_request(orte_job_t *jdata);
-static int send_cmd_terminate();
+static int send_cmd_terminate(void);
 
 /*
  * Global variable
@@ -81,12 +81,19 @@ static int init(void){
                     "%s ras:bbq:error: BBQUE_BACON_IP not set.",
                     ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
-    }
+    }   
     
     /*If so, create a socket and connect to BBQ*/
     
-    socket_fd=socket(AF_INET,SOCK_STREAM,0);
+    if(0 > (socket_fd=socket(AF_INET,SOCK_STREAM,0)))
+    {
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                    "%s ras:bbq:error: Cannot create socket.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
     
+    bzero(&addr, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = inet_addr(bbque_addr);
     addr.sin_port = htons(bbque_port);
@@ -223,7 +230,7 @@ static int finalize(void)
 }
 
 
-static int recv_nodes_reply()
+static int recv_nodes_reply(void)
 {
     orte_node_t *temp;
     int bytes;
@@ -254,7 +261,7 @@ static int recv_nodes_reply()
     return ORTE_SUCCESS;
 }
 
-static void launch_job()
+static void launch_job(void)
 {                    
     /*Insert received nodes into orte list for this job*/
     orte_ras_base_node_insert(&nodes, received_job);
@@ -276,7 +283,7 @@ static void launch_job()
     ORTE_ACTIVATE_JOB_STATE(received_job, ORTE_JOB_STATE_ALLOCATION_COMPLETE);
 }
 
-static int recv_cmd(){
+static int recv_cmd(void){
     int bytes;
     local_bbq_cmd_t response_cmd;
     
@@ -314,6 +321,8 @@ static int send_cmd_node_request(orte_job_t *jdata)
 {
     local_bbq_job_t job;
     local_bbq_cmd_t command;
+    orte_app_context_t *app;
+    int i;
     
     command.cmd_type=BBQ_CMD_NODES_REQUEST;
     
@@ -321,6 +330,7 @@ static int send_cmd_node_request(orte_job_t *jdata)
                     "%s ras:bbq: Sending command BBQ_CMD_NODES_REQUEST.",
                     ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
+   
     if(0>write(socket_fd,&command,sizeof(local_bbq_cmd_t)))
     {
         opal_output_verbose(0, orte_ras_base_framework.framework_output,
@@ -330,7 +340,18 @@ static int send_cmd_node_request(orte_job_t *jdata)
     }
 
     job.jobid=jdata->jobid;
-    job.slots_requested=jdata->num_procs;
+    
+    /*
+     * Sums up the num_procs parameters of all the elements in apps array of the job. 
+     * To be done in order to tell BBQ how many nodes have been requested via -np option in mpirun command.
+     */
+    
+    for (i=0; i < jdata->apps->size; i++) {
+        if (NULL == (app = (orte_app_context_t*)opal_pointer_array_get_item(jdata->apps, i))) {
+            continue;
+        }
+        job.slots_requested+=app->num_procs;
+    }
 
 
     if(0>write(socket_fd,&job,sizeof(local_bbq_job_t)))
@@ -342,13 +363,14 @@ static int send_cmd_node_request(orte_job_t *jdata)
     }
 
     opal_output_verbose(0, orte_ras_base_framework.framework_output,
-        "%s ras:bbq: Requested resources for job %d.",
-        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),job.jobid);
+        "%s ras:bbq: Requested %u slots for job %u.",
+        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),job.slots_requested,job.jobid);
     
     return ORTE_SUCCESS;
 }
 
-static int send_cmd_terminate()
+
+static int send_cmd_terminate(void)
 {
     local_bbq_cmd_t command;
     
@@ -364,5 +386,6 @@ static int send_cmd_terminate()
             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
+    
     return ORTE_SUCCESS;
 }
