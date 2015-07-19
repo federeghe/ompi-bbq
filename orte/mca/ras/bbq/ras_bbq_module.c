@@ -20,16 +20,14 @@
 
 #include "netinet/in.h"
 #include "orte/mca/state/state.h"
-
 #include "orte_config.h"
 #include "orte/constants.h"
 #include "orte/types.h"
-
 #include "orte/mca/errmgr/errmgr.h"
 #include "orte/runtime/orte_globals.h"
 #include "orte/util/name_fns.h"
-
 #include "orte/mca/ras/base/ras_private.h"
+#include "orte/mca/rmaps/base/base.h"
 #include "ras_bbq.h"
 #include "bbq_ompi_types.h"
 
@@ -38,10 +36,12 @@ static int init(void);
 static int recv_data(int fd, short args, void *cbdata);
 static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes);
 static int finalize(void);
-static void clear_nodes_list(opal_list_t *nodes);
 static int send_cmd(orte_job_t *jdata, int cmd);
-static int recv_nodes_reply(local_bbq_res_item_t *response_host, opal_list_t *nodes);
-
+static int recv_nodes_reply();
+static void launch_job();
+static int recv_cmd();
+static int send_cmd_node_request(orte_job_t *jdata);
+static int send_cmd_terminate();
 
 /*
  * Global variable
@@ -53,10 +53,11 @@ orte_ras_base_module_t orte_ras_bbq_module = {
     finalize
 };
 
-static int cmd_received=BBQ_CMD_NONE;
+static int cmd_received;
 static int socket_fd;
 static opal_event_t recv_ev;
 static orte_job_t *received_job;
+static opal_list_t nodes;
 
 static int init(void){
     
@@ -64,17 +65,25 @@ static int init(void){
     char *bbque_addr;
     struct sockaddr_in addr;
     
+    
+    /*Check if the environment variables needed to use BBQ are set*/
     if (0 == (bbque_port = atoi(getenv("BBQUE_BACON_PORT"))))
     {
-        printf("bbq:module:BBQUE_BACON_PORT variable not set\n");
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                    "%s ras:bbq:error: BBQUE_BACON_PORT not set.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
     
     if (NULL == (bbque_addr = getenv("BBQUE_BACON_IP")))
     {
-        printf("bbq:module:BBQUE_BACON_IP variable not set\n");
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                    "%s ras:bbq:error: BBQUE_BACON_IP not set.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
+    
+    /*If so, create a socket and connect to BBQ*/
     
     socket_fd=socket(AF_INET,SOCK_STREAM,0);
     
@@ -82,94 +91,79 @@ static int init(void){
     addr.sin_addr.s_addr = inet_addr(bbque_addr);
     addr.sin_port = htons(bbque_port);
     
-    if(connect(socket_fd,(struct sockaddr *)&addr, sizeof(addr)) < 0)
+    if(0>connect(socket_fd,(struct sockaddr *)&addr, sizeof(addr)))
     {
-        printf("bbq:module:Can't connect to bbque\n");
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                    "%s ras:bbq:error: Can't connect to BBQ.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
     
+    /*Tell OMPI framework to call recv_data when it receives something on socket_fd*/
     opal_event_set(orte_event_base, &recv_ev, socket_fd, OPAL_EV_READ, recv_data, NULL);
     opal_event_add(&recv_ev, 0);
     
-    printf("bbq:module:Module initialized\n");
+    OBJ_CONSTRUCT(&nodes, opal_list_t);
+    
+    cmd_received=BBQ_CMD_NONE;
+    
+    opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                    "%s ras:bbq: Module initialized.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
     return ORTE_SUCCESS;
 }
 
+/*
+ * This function is called by the OMPI event management system when some data is received 
+ * on the socket bound during the initialization of the module. 
+ * It basically loops and reads the received commands until it reaches the final message, or an error occurs.
+ * TODO: timer
+ */
+
 static int recv_data(int fd, short args, void *cbdata)
-{
-    local_bbq_cmd_t response_cmd;
-    local_bbq_res_item_t response_host;
-    opal_list_t nodes;
-    int bytes;
-    
-    OBJ_CONSTRUCT(&nodes, opal_list_t);
-    
-    printf("bbq:module:Data received!\n");
-    
+{   
     while(true){
-            
-            //TODO: fault tolerance, check for message size
-            switch(cmd_received){
-                case BBQ_CMD_NONE:
+        /*cmd_received state drives the execution flow*/
+        
+        switch(cmd_received){
+            case BBQ_CMD_NONE:
+            {
+                if(recv_cmd())
                 {
-                    bytes=read(socket_fd,&response_cmd,sizeof(local_bbq_cmd_t));
-                    if(bytes!=sizeof(local_bbq_cmd_t))
-                    {
-                        printf("bbq:module:Error while reading command\n");
-                        return ORTE_ERROR;
-                    }
-                
-                    switch(response_cmd.cmd_type)
-                    {
-                        case BBQ_CMD_NODES_REPLY:
-                        {
-                            printf("bbq:module:Received command BBQ_CMD_NODES_REPLY\n");
-                            cmd_received=BBQ_CMD_NODES_REPLY;
-                            break;
-                        }
-                        default:
-                        {
-                            printf("bbq:module:Unknown command received\n");
-                            return ORTE_ERROR;
-                        }
-                    }
-                    break;
-                }
-                case BBQ_CMD_NODES_REPLY:
-                {
-                    printf("bbq:module:Waiting for some data...\n");
-                    bytes=read(socket_fd,&response_host,sizeof(local_bbq_res_item_t));
-                    if(bytes!=sizeof(local_bbq_res_item_t))
-                    {
-                        printf("bbq:module:Error while reading host\n");
-                        return ORTE_ERROR;
-                    }
-                    cmd_received=recv_nodes_reply(&response_host, &nodes);
-                    break;
-                }
-                case BBQ_CMD_FINISHED:
-                {
-                    cmd_received=BBQ_CMD_NONE;
-                    
-                    orte_ras_base_node_insert(&nodes, received_job);
-                
-                    printf("bbq:module:Job allocation complete!\n");
-                
-                    OBJ_DESTRUCT(&nodes);
-                
-                    ORTE_ACTIVATE_JOB_STATE(received_job, ORTE_JOB_STATE_ALLOCATION_COMPLETE);
-                    return ORTE_SUCCESS;
-                }
-                default:
-                {
-                    printf("bbq:module:Invalid cmd_received state");
                     return ORTE_ERROR;
                 }
+                break;
             }
-            
+            case BBQ_CMD_NODES_REPLY:
+            {
+                if(recv_nodes_reply())
+                {
+                    return ORTE_ERROR;
+                }
+                break;
+            }
+            case BBQ_CMD_FINISHED:
+            {
+                launch_job();
+                
+                cmd_received=BBQ_CMD_NONE;
+
+                return ORTE_SUCCESS;
+            }
+            default:
+            {
+                opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                    "%s ras:bbq:error: Invalid cmd_received state.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                return ORTE_ERROR;
+            }
         }
+            
+    }
 }
+
+/*This function is called internally by OMPI when mpirun command is executed*/
 
 static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes)
 {
@@ -177,51 +171,38 @@ static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes)
     
     send_cmd(jdata, BBQ_CMD_NODES_REQUEST);
     
+    /*
+     * Since we have to wait for BBQ to send us the nodes list,
+     * we notify OMPI that the allocation phase is not over yet.
+     */
     return ORTE_ERR_ALLOCATION_PENDING;
 }
 
 static int send_cmd(orte_job_t *jdata, int cmd)
-{
-    local_bbq_cmd_t command;
-    local_bbq_job_t job;
-    
-    command.cmd_type=cmd;
-    
+{   
     switch(cmd){
         case BBQ_CMD_NODES_REQUEST:
         {
-            printf("bbq:module:Sending command BBQ_CMD_NODES_REQUEST...\n");
-
-            if(0>write(socket_fd,&command,sizeof(local_bbq_cmd_t)))
+            if(send_cmd_node_request(jdata))
             {
-                printf("bbq:module:Error while sending command\n");
                 return ORTE_ERROR;
             }
-
-            job.jobid=jdata->jobid;
-            job.slots_requested=jdata->num_procs;
-
-
-            if(0>write(socket_fd,&job,sizeof(local_bbq_job_t)))
-            {
-                printf("bbq:module:Error while sending job\n");
-                return ORTE_ERROR;
-            }
-            
-            printf("bbq:module:Asked resources for job %u, waiting for BBQ to answer...\n",
-                    jdata->jobid);
-
             break;
         }
         case BBQ_CMD_TERMINATE:
         {
-            printf("bbq:module:Sending command BBQ_CMD_TERMINATE...\n");
-            if(0>write(socket_fd,&command,sizeof(local_bbq_cmd_t)))
+            if(send_cmd_terminate())
             {
-                printf("bbq:module:Error while sending command\n");
                 return ORTE_ERROR;
             }
             break;
+        }
+        default:
+        {
+            opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq:error: Invalid command.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            return ORTE_ERROR;
         }
     }
     return ORTE_SUCCESS;
@@ -241,32 +222,147 @@ static int finalize(void)
     return ORTE_SUCCESS;
 }
 
-static void clear_nodes_list(opal_list_t *nodes)
-{
-    printf("bbq:module:Clearing node list before calling BBQUE...\n");
-    while(!opal_list_is_empty(nodes))
-    {
-        opal_list_remove_first(nodes);
-    }
-    printf("bbq:module:Node list cleaned\n");
-}
 
-static int recv_nodes_reply(local_bbq_res_item_t *response_host, opal_list_t *nodes)
+static int recv_nodes_reply()
 {
     orte_node_t *temp;
+    int bytes;
+    local_bbq_res_item_t response_item;
     
-    printf("bbq:module:Node data received\n");
+    bytes=read(socket_fd,&response_item,sizeof(local_bbq_res_item_t));
+    if(bytes!=sizeof(local_bbq_res_item_t))
+    {
+        printf("bbq:module:error: Error while reading host\n");
+        return ORTE_ERROR;
+    }
+    
+    opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: Node data received.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    
     temp = OBJ_NEW(orte_node_t);
-
-    temp->name=strdup(response_host->hostname);
+    
+    temp->name=strdup(response_item.hostname);
     temp->slots_inuse=0;
-    temp->slots_max=0;
-    temp->slots=response_host->slots_available;
+    temp->slots_max=response_item.slots_available;
+    temp->slots=response_item.slots_available;
     temp->state=ORTE_NODE_STATE_UP;
 
-    opal_list_append(nodes, &temp->super);
-    printf("bbq:module:Node %s appended to the list with %d slots\n",temp->name,temp->slots);
-    printf("bbq:module:Nodes left to append: %d\n", response_host->more_items);
+    opal_list_append(&nodes, &temp->super);
     
-    return response_host->more_items==0? BBQ_CMD_FINISHED : BBQ_CMD_NODES_REPLY;
+    cmd_received=(response_item.more_items==0? BBQ_CMD_FINISHED : BBQ_CMD_NODES_REPLY);
+    return ORTE_SUCCESS;
+}
+
+static void launch_job()
+{                    
+    /*Insert received nodes into orte list for this job*/
+    orte_ras_base_node_insert(&nodes, received_job);
+
+    opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: Job allocation complete.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
+    OBJ_DESTRUCT(&nodes);
+
+    /* default to no-oversubscribe-allowed for managed systems */
+    /* so ompi never allocates more process than slots available. */
+    if (!(ORTE_MAPPING_SUBSCRIBE_GIVEN & ORTE_GET_MAPPING_DIRECTIVE(orte_rmaps_base.mapping))) {
+        ORTE_SET_MAPPING_DIRECTIVE(orte_rmaps_base.mapping, ORTE_MAPPING_NO_OVERSUBSCRIBE);
+    }
+    /* flag that the allocation is managed (do not search in hostfile, take the ip from ras) */
+    orte_managed_allocation = true;
+
+    ORTE_ACTIVATE_JOB_STATE(received_job, ORTE_JOB_STATE_ALLOCATION_COMPLETE);
+}
+
+static int recv_cmd(){
+    int bytes;
+    local_bbq_cmd_t response_cmd;
+    
+    bytes=read(socket_fd,&response_cmd,sizeof(local_bbq_cmd_t));
+    if(bytes!=sizeof(local_bbq_cmd_t))
+    {
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: Error while reading command.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+
+    switch(response_cmd.cmd_type)
+    {
+        case BBQ_CMD_NODES_REPLY:
+        {
+            opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: BBQ sent command:BBQ_CMD_NODES_REPLY. Expecting node data. ",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            cmd_received=BBQ_CMD_NODES_REPLY;
+            break;
+        }
+        default:
+        {
+            opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq:error: BBQ sent command:unknown.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            return ORTE_ERROR;
+        }
+    }
+    return ORTE_SUCCESS;
+}
+
+static int send_cmd_node_request(orte_job_t *jdata)
+{
+    local_bbq_job_t job;
+    local_bbq_cmd_t command;
+    
+    command.cmd_type=BBQ_CMD_NODES_REQUEST;
+    
+    opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                    "%s ras:bbq: Sending command BBQ_CMD_NODES_REQUEST.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
+    if(0>write(socket_fd,&command,sizeof(local_bbq_cmd_t)))
+    {
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+            "%s ras:bbq:error: Error occurred while sending command BBQ_CMD_NODES_REQUEST.",
+            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+
+    job.jobid=jdata->jobid;
+    job.slots_requested=jdata->num_procs;
+
+
+    if(0>write(socket_fd,&job,sizeof(local_bbq_job_t)))
+    {
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+            "%s ras:bbq:error: Error occurred while sending resources request for job %d",
+            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),job.jobid);
+        return ORTE_ERROR;
+    }
+
+    opal_output_verbose(0, orte_ras_base_framework.framework_output,
+        "%s ras:bbq: Requested resources for job %d.",
+        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),job.jobid);
+    
+    return ORTE_SUCCESS;
+}
+
+static int send_cmd_terminate()
+{
+    local_bbq_cmd_t command;
+    
+    command.cmd_type=BBQ_CMD_TERMINATE;
+    
+    opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: Sending command BBQ_CMD_TERMINATE.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    if(0>write(socket_fd,&command,sizeof(local_bbq_cmd_t)))
+    {
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+            "%s ras:bbq:error: Error occurred while sending command BBQ_CMD_TERMINATE.",
+            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+    return ORTE_SUCCESS;
 }
