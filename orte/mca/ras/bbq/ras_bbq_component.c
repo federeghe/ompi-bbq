@@ -63,7 +63,7 @@ static int _priority;
 
 static int ras_bbq_register(void)
 {
-    printf("Registering BBQ!\n");
+    printf("bbq:component:Registering BBQ...\n");
     mca_base_component_t *c = &mca_ras_bbq_component.super.base_version;
 
     _priority = 100;
@@ -90,7 +90,7 @@ static int ras_bbq_close(void)
 
 static int orte_ras_bbq_component_query(mca_base_module_t **module, int *priority)
 {
-    printf("Querying BBQ!\n");
+    printf("bbq:component:BBQ component queried\n");
     if (NULL == getenv("BBQUE_BACON_IP") || NULL == getenv("BBQUE_BACON_PORT")){
         /* disqualify ourselves */
         *priority = 0;

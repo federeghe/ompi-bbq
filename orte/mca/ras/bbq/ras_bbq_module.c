@@ -39,7 +39,7 @@ static int recv_data(int fd, short args, void *cbdata);
 static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes);
 static int finalize(void);
 static void clear_nodes_list(opal_list_t *nodes);
-static int send_cmd(orte_job_t *jdata);
+static int send_cmd(orte_job_t *jdata, int cmd);
 static int recv_nodes_reply(local_bbq_res_item_t *response_host, opal_list_t *nodes);
 
 
@@ -106,7 +106,6 @@ static int recv_data(int fd, short args, void *cbdata)
     OBJ_CONSTRUCT(&nodes, opal_list_t);
     
     printf("bbq:module:Data received!\n");
-    printf("bbq:module:Job to be executed: %u\n", received_job->jobid);
     
     while(true){
             
@@ -125,7 +124,7 @@ static int recv_data(int fd, short args, void *cbdata)
                     {
                         case BBQ_CMD_NODES_REPLY:
                         {
-                            printf("bbq:module:Received command %d\n",response_cmd.cmd_type);
+                            printf("bbq:module:Received command BBQ_CMD_NODES_REPLY\n");
                             cmd_received=BBQ_CMD_NODES_REPLY;
                             break;
                         }
@@ -139,7 +138,7 @@ static int recv_data(int fd, short args, void *cbdata)
                 }
                 case BBQ_CMD_NODES_REPLY:
                 {
-                    printf("Waiting for the data...\n");
+                    printf("bbq:module:Waiting for some data...\n");
                     bytes=read(socket_fd,&response_host,sizeof(local_bbq_res_item_t));
                     if(bytes!=sizeof(local_bbq_res_item_t))
                     {
@@ -174,48 +173,64 @@ static int recv_data(int fd, short args, void *cbdata)
 
 static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes)
 {
-    //clear_nodes_list(nodes);
     received_job=jdata;
     
-    send_cmd(jdata);
+    send_cmd(jdata, BBQ_CMD_NODES_REQUEST);
     
     return ORTE_ERR_ALLOCATION_PENDING;
 }
 
-static int send_cmd(orte_job_t *jdata)
+static int send_cmd(orte_job_t *jdata, int cmd)
 {
     local_bbq_cmd_t command;
     local_bbq_job_t job;
     
-    command.cmd_type=BBQ_CMD_NODES_REQUEST;
+    command.cmd_type=cmd;
     
-    printf("bbq:module:Sending command 0...\n");
-    
-    if(0>write(socket_fd,&command,sizeof(local_bbq_cmd_t)))
-    {
-        printf("bbq:module:Error while sending command\n");
-        return ORTE_ERROR;
+    switch(cmd){
+        case BBQ_CMD_NODES_REQUEST:
+        {
+            printf("bbq:module:Sending command BBQ_CMD_NODES_REQUEST...\n");
+
+            if(0>write(socket_fd,&command,sizeof(local_bbq_cmd_t)))
+            {
+                printf("bbq:module:Error while sending command\n");
+                return ORTE_ERROR;
+            }
+
+            job.jobid=jdata->jobid;
+            job.slots_requested=jdata->num_procs;
+
+
+            if(0>write(socket_fd,&job,sizeof(local_bbq_job_t)))
+            {
+                printf("bbq:module:Error while sending job\n");
+                return ORTE_ERROR;
+            }
+            
+            printf("bbq:module:Asked resources for job %u, waiting for BBQ to answer...\n",
+                    jdata->jobid);
+
+            break;
+        }
+        case BBQ_CMD_TERMINATE:
+        {
+            printf("bbq:module:Sending command BBQ_CMD_TERMINATE...\n");
+            if(0>write(socket_fd,&command,sizeof(local_bbq_cmd_t)))
+            {
+                printf("bbq:module:Error while sending command\n");
+                return ORTE_ERROR;
+            }
+            break;
+        }
     }
-    
-    job.jobid=jdata->jobid;
-    job.slots_requested=jdata->num_procs;
-    
-    printf("bbq:module:Sending job %u with %u numprocs, %u total_slots_alloc, %u state, %u ...\n",
-            jdata->jobid,jdata->num_procs,jdata->total_slots_alloc,jdata->state);
-    
-    if(0>write(socket_fd,&job,sizeof(local_bbq_job_t)))
-    {
-        printf("bbq:module:Error while sending job\n");
-        return ORTE_ERROR;
-    }
-    
-    printf("bbq:module:Everything sent, waiting for BBQ to answer...\n");
-    
     return ORTE_SUCCESS;
 }
 
 static int finalize(void)
 {
+    send_cmd(NULL, BBQ_CMD_TERMINATE);
+    
     opal_event_del(&recv_ev);
     
     OBJ_DESTRUCT(received_job);
@@ -240,7 +255,7 @@ static int recv_nodes_reply(local_bbq_res_item_t *response_host, opal_list_t *no
 {
     orte_node_t *temp;
     
-    printf("Data received\n");
+    printf("bbq:module:Node data received\n");
     temp = OBJ_NEW(orte_node_t);
 
     temp->name=strdup(response_host->hostname);
@@ -250,8 +265,8 @@ static int recv_nodes_reply(local_bbq_res_item_t *response_host, opal_list_t *no
     temp->state=ORTE_NODE_STATE_UP;
 
     opal_list_append(nodes, &temp->super);
-    printf("bbq:module:Node %s appended to the list\n",temp->name);
-    printf("bbq:module:Remaining nodes: %d\n", response_host->more_items);
+    printf("bbq:module:Node %s appended to the list with %d slots\n",temp->name,temp->slots);
+    printf("bbq:module:Nodes left to append: %d\n", response_host->more_items);
     
     return response_host->more_items==0? BBQ_CMD_FINISHED : BBQ_CMD_NODES_REPLY;
 }
