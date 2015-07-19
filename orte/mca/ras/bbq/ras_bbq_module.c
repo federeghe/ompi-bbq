@@ -346,14 +346,13 @@ static int send_cmd_node_request(void)
      * Sums up the num_procs parameters of all the elements in apps array of the job. 
      * To be done in order to tell BBQ how many nodes have been requested via -np option in mpirun command.
      */
-    
+    job.slots_requested = 0;
     for (i=0; i < received_job->apps->size; i++) {
         if (NULL == (app = (orte_app_context_t*)opal_pointer_array_get_item(received_job->apps, i))) {
             continue;
         }
         job.slots_requested+=app->num_procs;
     }
-
 
     if(0>write(socket_fd,&job,sizeof(local_bbq_job_t)))
     {

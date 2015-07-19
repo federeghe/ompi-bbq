@@ -11,8 +11,8 @@
 
 /***********  Common   ************/
 struct local_bbq_cmd_t {
+	uint32_t jobid;			/* The jobid  */
 	uint8_t cmd_type;		/* Command number: */
-	uint32_t jobid;						/* -  */
 							/* Other things here? */
 };
 typedef struct local_bbq_cmd_t local_bbq_cmd_t;
