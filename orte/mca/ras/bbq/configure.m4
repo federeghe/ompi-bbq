@@ -26,11 +26,11 @@
 AC_DEFUN([MCA_orte_ras_bbq_CONFIG],[
     AC_CONFIG_FILES([orte/mca/ras/bbq/Makefile])
 
-    ORTE_CHECK_TM([ras_bbq], [ras_bbq_good=1], [ras_bbq_good=0])
+    #ORTE_CHECK_BBQ([ras_bbq], [ras_bbq_good=1],[ras_bbq_good=0])
 
     # if check worked, set wrapper flags if so.  
     # Evaluate succeed / fail
-    AS_IF([test "$ras_bbq_good" = "1"],
+    AS_IF([true],
           [$1],
           [$2])
 

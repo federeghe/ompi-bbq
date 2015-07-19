@@ -27,6 +27,10 @@
 #include "orte/mca/ras/base/ras_private.h"
 #include "ras_bbq.h"
 
+#define ORTE_SUCCESS 1
+#define ORTE_ERROR 0
+#define ORTE_ERROR_ALLOCATION_PENDING 2
+
 static int ras_bbq_register(void);
 static int ras_bbq_open(void);
 static int ras_bbq_close(void);
@@ -48,7 +52,7 @@ orte_ras_bbq_component_t mca_ras_bbq_component = {
 
             /* Component open and close functions */
             ras_bbq_open,
-			ras_bbq_close,
+            ras_bbq_close,
             orte_ras_bbq_component_query,
             ras_bbq_register
         },
@@ -79,7 +83,7 @@ static int ras_bbq_close(void)
 
 static int orte_ras_bbq_component_query(mca_base_module_t **module, int *priority)
 {
-    if (NULL == getenv("BBQUE_BACON_IP"){
+    if (NULL == getenv("BBQUE_BACON_IP")){
         /* disqualify ourselves */
         *priority = 0;
         *module = NULL;

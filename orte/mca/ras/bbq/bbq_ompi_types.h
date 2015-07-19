@@ -31,4 +31,4 @@ struct local_bbq_res_item_t {
 };
 typedef struct local_bbq_res_item_t local_bbq_res_item_t;
 
-#endif BBQ_TYPES
+#endif
