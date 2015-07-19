@@ -27,10 +27,6 @@
 #include "orte/mca/ras/base/ras_private.h"
 #include "ras_bbq.h"
 
-#define ORTE_SUCCESS 1
-#define ORTE_ERROR 0
-#define ORTE_ERROR_ALLOCATION_PENDING 2
-
 static int ras_bbq_register(void);
 static int ras_bbq_open(void);
 static int ras_bbq_close(void);
@@ -63,9 +59,19 @@ orte_ras_bbq_component_t mca_ras_bbq_component = {
     }
 };
 
+static uint8_t priority;
+
 static int ras_bbq_register(void)
 {
-	/* TODO */
+    mca_base_component_t *c = &mca_ras_bbq_component.super.base_version;
+
+    priority = 100;
+    (void) mca_base_component_var_register(c, "priority", "Priority of the tm ras component",
+                                           MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
+                                           OPAL_INFO_LVL_9,
+                                           MCA_BASE_VAR_SCOPE_READONLY,
+                                           &priority);
+
     return ORTE_SUCCESS;
 }
 
