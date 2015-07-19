@@ -52,11 +52,10 @@ orte_ras_base_module_t orte_ras_bbq_module = {
     finalize
 };
 
+static bool cmd_received=false;
 static int socket_fd;
 static opal_event_t recv_ev;
-static opal_list_t *received_nodes;
 static orte_job_t *received_job;
-static bool cmd_received;
 
 static int init(void){
     
@@ -91,8 +90,6 @@ static int init(void){
     opal_event_set(orte_event_base, &recv_ev, socket_fd, OPAL_EV_READ, recv_data, NULL);
     opal_event_add(&recv_ev, 0);
     
-    OBJ_CONSTRUCT(&received_nodes, opal_list_t);
-    
     printf("bbq:module:Module initialized\n");
     
     return ORTE_SUCCESS;
@@ -103,57 +100,85 @@ static int recv_data(int fd, short args, void *cbdata)
     local_bbq_cmd_t response_cmd;
     local_bbq_res_item_t response_host;
     orte_node_t *temp;
+    opal_list_t nodes;
     
+    OBJ_CONSTRUCT(&nodes, opal_list_t);
     
-    if(!cmd_received)
-    {
-        if(0>read(socket_fd,&response_cmd,sizeof(local_bbq_cmd_t)))
+    printf("bbq:module:Data received!\n");
+    printf("bbq:module:Job to be executed: %u", received_job->jobid);
+    
+    while(true){
+        if(!cmd_received)
         {
-            printf("bbq:module:Error while reading command\n");
-            return ORTE_ERROR;
-        }
-        if(response_cmd.cmd_type!= BBQ_CMD_NODES_REPLY)
-        {
-            printf("bbq:module:Bad command received\n");
-            return ORTE_ERROR;
-        }
-        cmd_received=true;
-    }
-    else
-    {
-        if(0>read(socket_fd,&response_host,sizeof(local_bbq_res_item_t)))
-        {
-            printf("bbq:module:Error while reading host\n");
-            return ORTE_ERROR;
-        }
-        if(response_host.more_items==0)
-        {
-            ORTE_ACTIVATE_JOB_STATE(received_job, ORTE_JOB_STATE_ALLOCATION_COMPLETE);
-            printf("bbq:module:Job allocation complete!\n");
-            cmd_received=false;
+            if(0>read(socket_fd,&response_cmd,sizeof(local_bbq_cmd_t)))
+            {
+                printf("bbq:module:Error while reading command\n");
+                return ORTE_ERROR;
+            }
+            if(response_cmd.cmd_type!= BBQ_CMD_NODES_REPLY)
+            {
+                printf("bbq:module:Bad command received\n");
+                return ORTE_ERROR;
+            }
+            printf("bbq:module:Received command %d\n",response_cmd.cmd_type);
+            cmd_received=true;
         }
         else
         {
-            temp = OBJ_NEW(orte_node_t);
-            strcpy(temp->name,response_host.hostname);
-            temp->slots=response_host.slots_available;
-            opal_list_append(received_nodes, &temp->super);
-            printf("bbq:module:Node %s appended to the list\n",temp->name);
+            printf("Waiting for the data...\n");
+            if(0>read(socket_fd,&response_host,sizeof(local_bbq_res_item_t)))
+            {
+                printf("bbq:module:Error while reading host\n");
+                return ORTE_ERROR;
+            }
+            if(response_host.more_items==0)
+            {
+                orte_ras_base_node_insert(&nodes, received_job);
+                
+                printf("bbq:module:Job allocation complete!\n");
+                
+                OBJ_DESTRUCT(&nodes);
+                
+                ORTE_ACTIVATE_JOB_STATE(received_job, ORTE_JOB_STATE_ALLOCATION_COMPLETE);
+                return ORTE_SUCCESS;
+            }
+            else
+            {
+                printf("Data received\n");
+                temp = OBJ_NEW(orte_node_t);
+                
+                if (NULL==temp)
+                {
+                    printf("Temp=NULL\n");
+                    return 0;
+                }
+                
+                temp->name=strdup(response_host.hostname);
+                printf("Strdup executed: %s\n",temp->name);
+                temp->slots_inuse=0;
+                temp->slots_max=0;
+                temp->slots=response_host.slots_available;
+                temp->state=ORTE_NODE_STATE_UP;
+                
+                if(NULL==&nodes)
+                {
+                    printf("Nodes=NULL\n");
+                    return 0;
+                }
+                
+                printf("Nodes!=NULL\n");
+                
+                opal_list_append(&nodes, &temp->super);
+                printf("bbq:module:Node %s appended to the list\n",temp->name);
+            }
+
         }
-        
     }
-    return ORTE_SUCCESS;
-    
-    
-    
-    
-    
 }
 
 static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes)
 {
     clear_nodes_list(nodes);
-    received_nodes=nodes;
     received_job=jdata;
     
     send_cmd(jdata);
@@ -198,7 +223,6 @@ static int finalize(void)
     opal_event_del(&recv_ev);
     
     OBJ_DESTRUCT(received_job);
-    OBJ_DESTRUCT(received_nodes);
     
     shutdown(socket_fd, 2);
     close(socket_fd);
