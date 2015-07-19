@@ -63,7 +63,6 @@ static int _priority;
 
 static int ras_bbq_register(void)
 {
-    printf("bbq:component:Registering BBQ...\n");
     mca_base_component_t *c = &mca_ras_bbq_component.super.base_version;
 
     _priority = 100;
@@ -72,6 +71,10 @@ static int ras_bbq_register(void)
                                            OPAL_INFO_LVL_9,
                                            MCA_BASE_VAR_SCOPE_READONLY,
                                            &_priority);
+    
+    opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                    "%s ras:bbq: BBQ registered",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
     return ORTE_SUCCESS;
 }
@@ -90,12 +93,8 @@ static int ras_bbq_close(void)
 
 static int orte_ras_bbq_component_query(mca_base_module_t **module, int *priority)
 {
-    /*opal_output_verbose(100, orte_ras_base_framework.framework_output,
-                                "%s ras:bbq: HIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII!",
-                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));*/
-    printf("bbq:component:BBQ component queried\n");
-    if (NULL == getenv("BBQUE_BACON_IP") || NULL == getenv("BBQUE_BACON_PORT")){
-        /* disqualify ourselves */
+    if (NULL == getenv("BBQUE_BACON_IP") || NULL == getenv("BBQUE_BACON_PORT"))
+    {
         *priority = 0;
         *module = NULL;
         printf("bbq:component:Undefined environment variables for BBQ\n");
@@ -105,10 +104,7 @@ static int orte_ras_bbq_component_query(mca_base_module_t **module, int *priorit
     OPAL_OUTPUT_VERBOSE((2, orte_ras_base_framework.framework_output,
                          "%s ras:bbque: available for selection",
                          ORTE_NAME_PRINT(ORTE_PROC_MY_NAME)));
-    /* since only one RM can exist on a cluster, just set
-     * my priority to something - the other components won't
-     * be responding anyway
-     */
+    
     *priority = 50;
     *module = (mca_base_module_t *) &orte_ras_bbq_module;
     return ORTE_SUCCESS;
