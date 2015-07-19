@@ -59,18 +59,19 @@ orte_ras_bbq_component_t mca_ras_bbq_component = {
     }
 };
 
-static uint8_t priority;
+static int _priority;
 
 static int ras_bbq_register(void)
 {
+    printf("Registering BBQ!\n");
     mca_base_component_t *c = &mca_ras_bbq_component.super.base_version;
 
-    priority = 100;
-    (void) mca_base_component_var_register(c, "priority", "Priority of the tm ras component",
+    _priority = 100;
+    (void) mca_base_component_var_register(c, "priority", "Priority of the bbq ras component",
                                            MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
                                            OPAL_INFO_LVL_9,
                                            MCA_BASE_VAR_SCOPE_READONLY,
-                                           &priority);
+                                           &_priority);
 
     return ORTE_SUCCESS;
 }
@@ -89,10 +90,12 @@ static int ras_bbq_close(void)
 
 static int orte_ras_bbq_component_query(mca_base_module_t **module, int *priority)
 {
-    if (NULL == getenv("BBQUE_BACON_IP")){
+    printf("Querying BBQ!\n");
+    if (NULL == getenv("BBQUE_BACON_IP") || NULL == getenv("BBQUE_BACON_PORT")){
         /* disqualify ourselves */
         *priority = 0;
         *module = NULL;
+        printf("Cannot find envs\n");
         return ORTE_ERROR;
     }
 

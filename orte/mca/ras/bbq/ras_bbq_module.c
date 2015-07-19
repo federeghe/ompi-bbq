@@ -76,6 +76,8 @@ static int init(void){
         return ORTE_ERROR;
     }
     
+    socket_fd=socket(AF_INET,SOCK_STREAM,0);
+    
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = inet_addr(bbque_addr);
     addr.sin_port = htons(bbque_port);
@@ -177,7 +179,8 @@ static int send_cmd(orte_job_t *jdata)
     job.jobid=jdata->jobid;
     job.slots_requested=jdata->num_procs;
     
-    printf("bbq:module:Sending job %d with %d numprocs...\n",job.jobid,job.slots_requested);
+    printf("bbq:module:Sending job %u with %u numprocs, %u total_slots_alloc, %u state, %u ...\n",
+            jdata->jobid,jdata->num_procs,jdata->total_slots_alloc,jdata->state);
     
     if(0>write(socket_fd,&job,sizeof(local_bbq_job_t)))
     {
