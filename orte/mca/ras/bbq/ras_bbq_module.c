@@ -36,11 +36,11 @@ static int init(void);
 static int recv_data(int fd, short args, void *cbdata);
 static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes);
 static int finalize(void);
-static int send_cmd(orte_job_t *jdata, int cmd);
+static int send_cmd(int cmd);
 static int recv_nodes_reply(void);
 static void launch_job(void);
 static int recv_cmd(void);
-static int send_cmd_node_request(orte_job_t *jdata);
+static int send_cmd_node_request(void);
 static int send_cmd_terminate(void);
 
 /*
@@ -176,7 +176,7 @@ static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes)
 {
     received_job=jdata;
     
-    send_cmd(jdata, BBQ_CMD_NODES_REQUEST);
+    send_cmd(BBQ_CMD_NODES_REQUEST);
     
     /*
      * Since we have to wait for BBQ to send us the nodes list,
@@ -185,12 +185,12 @@ static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes)
     return ORTE_ERR_ALLOCATION_PENDING;
 }
 
-static int send_cmd(orte_job_t *jdata, int cmd)
+static int send_cmd(int cmd)
 {   
     switch(cmd){
         case BBQ_CMD_NODES_REQUEST:
         {
-            if(send_cmd_node_request(jdata))
+            if(send_cmd_node_request())
             {
                 return ORTE_ERROR;
             }
@@ -217,7 +217,7 @@ static int send_cmd(orte_job_t *jdata, int cmd)
 
 static int finalize(void)
 {
-    send_cmd(NULL, BBQ_CMD_TERMINATE);
+    send_cmd(BBQ_CMD_TERMINATE);
     
     opal_event_del(&recv_ev);
     
@@ -317,7 +317,7 @@ static int recv_cmd(void){
     return ORTE_SUCCESS;
 }
 
-static int send_cmd_node_request(orte_job_t *jdata)
+static int send_cmd_node_request(void)
 {
     local_bbq_job_t job;
     local_bbq_cmd_t command;
@@ -325,6 +325,7 @@ static int send_cmd_node_request(orte_job_t *jdata)
     int i;
     
     command.cmd_type=BBQ_CMD_NODES_REQUEST;
+    command.jobid=received_job->jobid;
     
     opal_output_verbose(0, orte_ras_base_framework.framework_output,
                     "%s ras:bbq: Sending command BBQ_CMD_NODES_REQUEST.",
@@ -339,15 +340,15 @@ static int send_cmd_node_request(orte_job_t *jdata)
         return ORTE_ERROR;
     }
 
-    job.jobid=jdata->jobid;
+    job.jobid=received_job->jobid;
     
     /*
      * Sums up the num_procs parameters of all the elements in apps array of the job. 
      * To be done in order to tell BBQ how many nodes have been requested via -np option in mpirun command.
      */
     
-    for (i=0; i < jdata->apps->size; i++) {
-        if (NULL == (app = (orte_app_context_t*)opal_pointer_array_get_item(jdata->apps, i))) {
+    for (i=0; i < received_job->apps->size; i++) {
+        if (NULL == (app = (orte_app_context_t*)opal_pointer_array_get_item(received_job->apps, i))) {
             continue;
         }
         job.slots_requested+=app->num_procs;
@@ -375,6 +376,7 @@ static int send_cmd_terminate(void)
     local_bbq_cmd_t command;
     
     command.cmd_type=BBQ_CMD_TERMINATE;
+    command.jobid=received_job->jobid;
     
     opal_output_verbose(0, orte_ras_base_framework.framework_output,
                 "%s ras:bbq: Sending command BBQ_CMD_TERMINATE.",
