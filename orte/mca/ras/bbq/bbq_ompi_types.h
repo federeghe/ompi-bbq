@@ -5,6 +5,7 @@
 #define BBQ_CMD_NONE -1
 #define BBQ_CMD_NODES_REQUEST 0
 #define BBQ_CMD_NODES_REPLY 1
+#define BBQ_CMD_TERMINATE 2
 
 #include <stdint.h>
 
