@@ -21,7 +21,7 @@
 
 # Use the top-level Makefile.options
 
-dist_ortedata_DATA = help-ras-bbq.txt
+dist_ompidata_DATA = help-ras-bbq.txt
 
 
 AM_CPPFLAGS = $(ras_bbq_CPPFLAGS)
@@ -48,7 +48,7 @@ component =
 component_sources =
 endif
 
-mcacomponentdir = $(ortelibdir)
+mcacomponentdir = $(ompilibdir)
 mcacomponent_LTLIBRARIES = $(component)
 mca_ras_bbq_la_SOURCES = $(component_sources)
 mca_ras_bbq_la_LDFLAGS = -module -avoid-version $(ras_bbq_LDFLAGS)

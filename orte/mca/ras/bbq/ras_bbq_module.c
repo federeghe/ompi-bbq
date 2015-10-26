@@ -18,11 +18,20 @@
  * $HEADER$
  */
 
-#include "netinet/in.h"
-#include "orte/mca/state/state.h"
 #include "orte_config.h"
 #include "orte/constants.h"
 #include "orte/types.h"
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+
+#include "orte/mca/state/state.h"
 #include "orte/mca/errmgr/errmgr.h"
 #include "orte/runtime/orte_globals.h"
 #include "orte/util/name_fns.h"
