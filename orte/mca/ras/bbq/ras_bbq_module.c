@@ -76,18 +76,18 @@ static int init(void){
     
     
     /*Check if the environment variables needed to use BBQ are set*/
-    if (0 == (bbque_port = atoi(getenv("BBQUE_BACON_PORT"))))
+    if (0 == (bbque_port = atoi(getenv("BBQUE_PORT"))))
     {
         opal_output_verbose(0, orte_ras_base_framework.framework_output,
-                    "%s ras:bbq:error: BBQUE_BACON_PORT not set.",
+                    "%s ras:bbq:error: BBQUE_PORT not set.",
                     ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
     
-    if (NULL == (bbque_addr = getenv("BBQUE_BACON_IP")))
+    if (NULL == (bbque_addr = getenv("BBQUE_IP")))
     {
         opal_output_verbose(0, orte_ras_base_framework.framework_output,
-                    "%s ras:bbq:error: BBQUE_BACON_IP not set.",
+                    "%s ras:bbq:error: BBQUE_IP not set.",
                     ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }   
@@ -139,44 +139,37 @@ static int init(void){
 
 static int recv_data(int fd, short args, void *cbdata)
 {   
-    while(true){
-        /*cmd_received state drives the execution flow*/
-        
-        switch(cmd_received){
-            case BBQ_CMD_NONE:
-            {
-                if(recv_cmd())
-                {
-                    return ORTE_ERROR;
-                }
-                break;
-            }
-            case BBQ_CMD_NODES_REPLY:
-            {
-                if(recv_nodes_reply())
-                {
-                    return ORTE_ERROR;
-                }
-                break;
-            }
-            case BBQ_CMD_FINISHED:
-            {
-                launch_job();
-                
-                cmd_received=BBQ_CMD_NONE;
 
-                return ORTE_SUCCESS;
-            }
-            default:
+    /*cmd_received state drives the execution flow*/
+    
+    switch(cmd_received) {
+    
+        case BBQ_CMD_NONE:
+        	/* No command received yet, we wait for it */
+            if(recv_cmd())
             {
-                opal_output_verbose(0, orte_ras_base_framework.framework_output,
-                    "%s ras:bbq:error: Invalid cmd_received state.",
-                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 return ORTE_ERROR;
             }
-        }
-            
+	        break;
+        case BBQ_CMD_NODES_REPLY:
+            /* We are receiving the node list from BBQ... */
+            if(recv_nodes_reply())
+            {
+                return ORTE_ERROR;
+            }
+    	    break;
+    	    
+        default:
+            opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq:error: Invalid cmd_received state.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            return ORTE_ERROR;
+
     }
+
+    opal_event_add(&recv_ev, 0);
+    return ORTE_SUCCESS;
+       
 }
 
 /*This function is called internally by OMPI when mpirun command is executed*/
@@ -266,7 +259,13 @@ static int recv_nodes_reply(void)
 
     opal_list_append(&nodes, &temp->super);
     
-    cmd_received=(response_item.more_items==0? BBQ_CMD_FINISHED : BBQ_CMD_NODES_REPLY);
+    if ( response_item.more_items==0 ) {
+        launch_job();
+        cmd_received=BBQ_CMD_NONE;
+    } else {
+    	cmd_received=BBQ_CMD_NODES_REPLY;
+    }
+    
     return ORTE_SUCCESS;
 }
 
