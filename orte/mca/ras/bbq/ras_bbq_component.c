@@ -93,11 +93,13 @@ static int ras_bbq_close(void)
 
 static int orte_ras_bbq_component_query(mca_base_module_t **module, int *priority)
 {
-    if (NULL == getenv("BBQUE_BACON_IP") || NULL == getenv("BBQUE_BACON_PORT"))
+    if (NULL == getenv("BBQUE_IP") || NULL == getenv("BBQUE_PORT"))
     {
         *priority = 0;
         *module = NULL;
-        printf("bbq:component:Undefined environment variables for BBQ\n");
+        OPAL_OUTPUT_VERBOSE((2, orte_ras_base_framework.framework_output,
+                         "%s ras:bbque: undefined environment variables for BBQ",
+                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME)));
         return ORTE_ERROR;
     }
 
