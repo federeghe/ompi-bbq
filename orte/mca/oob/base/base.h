@@ -175,6 +175,10 @@ OBJ_CLASS_DECLARATION(mca_oob_uri_req_t);
     }while(0);
 ORTE_DECLSPEC void orte_oob_base_set_addr(int fd, short args, void *cbdata);
 
+#define ORTE_OOB_PROCESS_URI(u) process_uri(u);
+ORTE_DECLSPEC void process_uri(char *uri);
+
+
 END_C_DECLS
 #endif
 
