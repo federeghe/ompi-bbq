@@ -739,6 +739,10 @@ static void mig_event(int event, void* data) {
         // Freeze all pending send
         peer->state = MCA_OOB_TCP_FREEZED;
 
+    break;
+
+    case ORTE_MIG_EXEC:
+
         mca_oob_tcp_peer_close(peer);
 
         /*

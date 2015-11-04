@@ -15,7 +15,8 @@
 
 // Costants for event
 #define ORTE_MIG_PREPARE 0
-#define ORTE_MIG_DONE 1
+#define ORTE_MIG_EXEC 1
+#define ORTE_MIG_DONE 2
 
 
 BEGIN_C_DECLS
