@@ -39,6 +39,8 @@
 #include "orte/util/show_help.h"
 #include "orte/mca/ess/base/base.h"
 #include "orte/mca/ess/ess.h"
+#include "orte/mca/mig/base/base.h"
+#include "orte/mca/mig/mig.h"
 #include "orte/mca/errmgr/errmgr.h"
 #include "orte/util/proc_info.h"
 #include "orte/util/error_strings.h"
@@ -134,6 +136,25 @@ int orte_init(int* pargc, char*** pargv, orte_proc_type_t flags)
         error = "orte_ess_base_select";
         goto error;
     }
+    
+    /* Open MIG and select the correct module*/
+    if (ORTE_SUCCESS != (ret = mca_base_framework_open(&orte_mig_base_framework, 0))) {
+        ORTE_ERROR_LOG(ret);
+        error = "orte_mig_base_open";
+        goto error;
+    }
+    if (ORTE_SUCCESS != (ret = orte_mig_base_select())) {
+        error = "orte_mig_base_select";
+        goto error;
+    }
+    /* Initialize MIG module */
+    
+    if (NULL != orte_mig_base.active_module && ORTE_SUCCESS != (ret = orte_mig_base.active_module->init())) {
+        error = "orte_mig_init";
+        goto error;
+    }
+    
+    
 
     if (!ORTE_PROC_IS_APP) {
         /* ORTE tools "block" in their own loop over the event
@@ -149,6 +170,7 @@ int orte_init(int* pargc, char*** pargv, orte_proc_type_t flags)
         error = "orte_ess_init";
         goto error;
     }
+    
     
     /* All done */
     return ORTE_SUCCESS;

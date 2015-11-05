@@ -124,6 +124,7 @@ int mca_base_framework_register (struct mca_base_framework_t *framework,
     return OPAL_SUCCESS;
 }
 
+
 int mca_base_framework_open (struct mca_base_framework_t *framework,
                              mca_base_open_flag_t flags) {
     int ret;
@@ -135,16 +136,16 @@ int mca_base_framework_open (struct mca_base_framework_t *framework,
     if (OPAL_SUCCESS != ret) {
         return ret;
     }
-
+    
     /* check if this framework is already open */
     if (framework_is_open (framework)) {
         return OPAL_SUCCESS;
     }
-
+    
     if (MCA_BASE_FRAMEWORK_FLAG_NOREGISTER & framework->framework_flags) {
         flags |= MCA_BASE_OPEN_FIND_COMPONENTS;
     }
-
+    
     /* lock all of this frameworks's variables */
     ret = mca_base_var_group_find (framework->framework_project,
                                    framework->framework_name,
@@ -153,19 +154,20 @@ int mca_base_framework_open (struct mca_base_framework_t *framework,
 
     /* check the verbosity level and open (or close) the output */
     framework_open_output (framework);
-
+    
+    
     if (NULL != framework->framework_open) {
         ret = framework->framework_open (flags);
     } else {
         ret = mca_base_framework_components_open (framework, flags);
     }
-
+    
     if (OPAL_SUCCESS != ret) {
         framework->framework_refcnt--;
     } else {
         framework->framework_flags |= MCA_BASE_FRAMEWORK_FLAG_OPEN;
     }
-
+    
     return ret;
 }
 

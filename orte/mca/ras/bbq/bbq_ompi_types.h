@@ -1,10 +1,18 @@
 #ifndef BBQ_TYPES
 #define BBQ_TYPES
 
+/* 
+ * BBQ-MPI-related constants
+ */
 #define BBQ_CMD_NONE -1
+
+/* Commands */
 #define BBQ_CMD_NODES_REQUEST 0
 #define BBQ_CMD_NODES_REPLY 1
 #define BBQ_CMD_TERMINATE 2
+
+/* Options */
+#define BBQ_OPT_MIG_AVAILABLE 0
 
 #include <stdint.h>
 
@@ -12,6 +20,7 @@
 struct local_bbq_cmd_t {
 	uint32_t jobid;			/* The jobid  */
 	uint8_t cmd_type;		/* Command number: */
+        uint8_t flags;                 /* Flags */
 							/* Other things here? */
 };
 typedef struct local_bbq_cmd_t local_bbq_cmd_t;

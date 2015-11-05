@@ -16,7 +16,7 @@
 BEGIN_C_DECLS
 
 typedef enum{
-    MIG_NONE,
+    MIG_AVAILABLE,
     MIG_MOVING,
     MIG_FINISHED,
     MIG_ERROR

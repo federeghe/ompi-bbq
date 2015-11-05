@@ -40,6 +40,9 @@
 #include "ras_bbq.h"
 #include "bbq_ompi_types.h"
 
+#include "orte/mca/mig/mig.h"
+#include "orte/mca/mig/base/base.h"
+
 
 static int init(void);
 static int recv_data(int fd, short args, void *cbdata);
@@ -73,7 +76,6 @@ static int init(void){
     short bbque_port;
     char *bbque_addr;
     struct sockaddr_in addr;
-    
     
     /*Check if the environment variables needed to use BBQ are set*/
     if (0 == (bbque_port = atoi(getenv("BBQUE_PORT"))))
@@ -240,8 +242,10 @@ static int recv_nodes_reply(void)
     
     bytes=read(socket_fd,&response_item,sizeof(local_bbq_res_item_t));
     if(bytes!=sizeof(local_bbq_res_item_t))
-    {
-        printf("bbq:module:error: Error while reading host\n");
+    {   
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: Error while reading host.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
     
@@ -331,6 +335,11 @@ static int send_cmd_node_request(void)
     local_bbq_cmd_t command;
     orte_app_context_t *app;
     int i;
+    
+    command.flags = 0;
+    if(NULL != orte_mig_base.active_module && orte_mig_base.active_module->state == MIG_AVAILABLE){
+        command.flags |= BBQ_OPT_MIG_AVAILABLE;
+    }
     
     command.cmd_type=BBQ_CMD_NODES_REQUEST;
     command.jobid=received_job->jobid;
