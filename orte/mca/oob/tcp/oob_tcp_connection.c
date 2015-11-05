@@ -855,6 +855,12 @@ void mca_oob_tcp_peer_close(mca_oob_tcp_peer_t *peer)
     close(peer->sd);
     peer->sd = -1;
 
+    if (MCA_OOB_TCP_FREEZED == peer->state) {
+        // Do nothing else, we must not inform the
+        // component-level
+        return;
+    }
+
     /* if we were CONNECTING, then we need to mark the address as
      * failed and cycle back to try the next address */
     if (MCA_OOB_TCP_CONNECTING == peer->state) {

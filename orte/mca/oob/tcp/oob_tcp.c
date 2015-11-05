@@ -44,6 +44,7 @@
 #endif
 #include <ctype.h>
 
+#include "opal/prefetch.h"
 #include "opal/util/show_help.h"
 #include "opal/util/error.h"
 #include "opal/util/output.h"
@@ -69,6 +70,9 @@
 #include "orte/mca/oob/tcp/oob_tcp_connection.h"
 #include "orte/mca/oob/tcp/oob_tcp_ping.h"
 
+#include "orte/mca/mig/mig_types.h"
+
+
 static void tcp_init(void);
 static void tcp_fini(void);
 static void accept_connection(const int accepted_fd,
@@ -80,6 +84,8 @@ static void ping(const orte_process_name_t *proc);
 static void send_nb(orte_rml_send_t *msg);
 static void resend(struct mca_oob_tcp_msg_error_t *mop);
 static void ft_event(int state);
+static void mig_event(int event, void* data);
+static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest);
 
 mca_oob_tcp_module_t mca_oob_tcp_module = {
     {
@@ -90,7 +96,8 @@ mca_oob_tcp_module_t mca_oob_tcp_module = {
         ping,
         send_nb,
         resend,
-        ft_event
+        ft_event,
+        mig_event
     }
 };
 
@@ -245,7 +252,7 @@ static int parse_uri(const uint16_t af_family,
         hints.ai_family = af_family;
         hints.ai_socktype = SOCK_STREAM;
         ret = getaddrinfo(host, NULL, &hints, &res);
-        
+
         if (ret) {
             opal_output (0, "oob_tcp_parse_uri: Could not resolve %s. [Error: %s]\n",
                          host, gai_strerror (ret));
@@ -259,7 +266,7 @@ static int parse_uri(const uint16_t af_family,
     else {
         return ORTE_ERR_NOT_SUPPORTED;
     }
-        
+
 
     return ORTE_SUCCESS;
 }
@@ -283,7 +290,7 @@ static void process_set_peer(int fd, short args, void *cbdata)
 
     if (AF_INET != pop->af_family) {
             opal_output_verbose(20, orte_oob_base_framework.framework_output,
-	                        "%s NOT AF_INET", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                            "%s NOT AF_INET", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         goto cleanup;
     }
 
@@ -448,6 +455,15 @@ static void process_send(int fd, short args, void *cbdata)
      */
     MCA_OOB_TCP_QUEUE_PENDING(op->msg, peer);
 
+    if (MCA_OOB_TCP_FREEZED == peer->state) {
+        /* The node is freezed so please wait */
+        opal_output_verbose(2, orte_oob_base_framework.framework_output,
+                                    "%s tcp:send_nb: %s is a freezed node",
+                                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                                    ORTE_NAME_PRINT(&peer->name));
+        goto cleanup;
+    }
+
     if (MCA_OOB_TCP_CONNECTING != peer->state &&
         MCA_OOB_TCP_CONNECT_ACK != peer->state) {
         /* we have to initiate the connection - again, we do not
@@ -462,6 +478,7 @@ static void process_send(int fd, short args, void *cbdata)
         peer->state = MCA_OOB_TCP_CONNECTING;
         ORTE_ACTIVATE_TCP_CONN_STATE(peer, mca_oob_tcp_peer_try_connect);
     }
+
 
  cleanup:
     OBJ_RELEASE(op);
@@ -511,6 +528,15 @@ static void process_resend(int fd, short args, void *cbdata)
                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
                             ORTE_NAME_PRINT(&peer->name));
         MCA_OOB_TCP_QUEUE_MSG(peer, op->snd, true);
+        goto cleanup;
+    }
+
+    if (MCA_OOB_TCP_FREEZED == peer->state) {
+        /* The node is freezed so please wait */
+        opal_output_verbose(2, orte_oob_base_framework.framework_output,
+                                    "%s tcp:send_nb: %s is a freezed node",
+                                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                                    ORTE_NAME_PRINT(&peer->name));
         goto cleanup;
     }
 
@@ -592,7 +618,7 @@ static void recv_handler(int sd, short flg, void *cbdata)
                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), strerror(opal_socket_errno), opal_socket_errno);
             }
         }
-        
+
         /* is the peer instance willing to accept this connection */
         peer->sd = sd;
         if (mca_oob_tcp_peer_accept(peer) == false) {
@@ -682,3 +708,91 @@ static void ft_event(int state) {
     return;
 }
 #endif
+
+/**
+ * Migration event handler.
+ *
+ * @param    state    the event type, please refer to mig/mig.h
+ * @param    data    a generic data. The type depends on state parameter
+ */
+static void mig_event(int event, void* data) {
+    static mca_oob_tcp_peer_t *peer = NULL;
+
+
+
+    switch(event) {
+
+    case ORTE_MIG_PREPARE:
+
+        // Search the peer corresponding to that process name
+        if (data != NULL) {
+            peer = mca_oob_tcp_peer_lookup((orte_process_name_t*)data);
+            if (OPAL_UNLIKELY(peer == NULL)) {
+                // Error, no source peer found
+                opal_output (0, "oob_tcp_mig_event: Could not find process %i:%i for migration.\n",
+                        ((orte_process_name_t*)data)->jobid, ((orte_process_name_t*)data)->vpid);
+                ORTE_ERROR_LOG(ORTE_ERR_BAD_PARAM);
+                return;
+            }
+        }
+
+        // Freeze all pending send
+        peer->state = MCA_OOB_TCP_FREEZED;
+
+    break;
+
+    case ORTE_MIG_EXEC:
+
+        mca_oob_tcp_peer_close(peer);
+
+        /*
+         * XXX: It seems not necessary to delete the peer from the hash table.
+         *      Check necessary.
+         *
+        uint64_t ui64;
+
+        // Remove the old peer from the table
+        memcpy(&ui64, (char*)src, sizeof(uint64_t));
+        opal_hash_table_remove_value_uint64(&mca_oob_tcp_module.peers, ui64);
+
+        // It's not necessary to add the new one: when the new orted connects,
+        // the process_uri function is called and new node added.
+        */
+    break;
+
+    case ORTE_MIG_DONE:
+        mig_done(peer, (const char*)data); //TODO
+    break;
+
+    default:
+        // Do nothing
+        opal_output(10, "%s mca_oob_tcp_mig_event: received unknown event: %i (ignored)",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), event);
+
+    }
+
+}
+
+
+static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest) {
+    char *peer_name=NULL;
+
+    // Get the converted peer string
+    orte_util_convert_process_name_to_string(&peer_name,&peer->name);
+
+    // Now transform it in: 000000.0;tcp:// ....
+    int uri_len  = strlen(uri_dest);
+    int peer_len = strlen(peer_name);
+    peer_name = realloc(peer_name, uri_len+peer_len+2);
+    peer_name[peer_len]   = ';';
+    peer_name[peer_len+1] = '\0';
+    strcat(peer_name, uri_dest);
+
+    // Let's update the peer hash table
+    process_uri(peer_name);
+
+    // And now, reconnect!
+    peer->state = MCA_OOB_TCP_CONNECTING;
+    ORTE_ACTIVATE_TCP_CONN_STATE(peer, mca_oob_tcp_peer_try_connect);
+
+}

@@ -25,7 +25,6 @@
 
 #include "orte/mca/oob/base/base.h"
 
-static void process_uri(char *uri);
 
 void orte_oob_base_send_nb(int fd, short args, void *cbdata)
 {
@@ -295,7 +294,7 @@ void orte_oob_base_set_addr(int fd, short args, void *cbdata)
     OBJ_RELEASE(req);
 }
 
-static void process_uri(char *uri)
+void process_uri(char *uri)
 {
     orte_process_name_t peer;
     char *cptr;
@@ -319,8 +318,18 @@ static void process_uri(char *uri)
     *cptr = '\0';
     cptr++;
 
+
+
     /* the first field is the process name, so convert it */
     orte_util_convert_string_to_process_name(&peer, uri);
+
+
+    opal_output_verbose(50, orte_oob_base_framework.framework_output,
+                        "%s:set_addr peer %s has uri: %s",
+                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                        ORTE_NAME_PRINT(&peer),
+						(const char*)cptr
+    );
 
     /* if the peer is us, no need to go further as we already
      * know our own contact info

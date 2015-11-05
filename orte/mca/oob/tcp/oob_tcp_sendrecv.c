@@ -131,6 +131,18 @@ void mca_oob_tcp_send_handler(int sd, short flags, void *cbdata)
                         ORTE_NAME_PRINT(&peer->name));
 
     switch (peer->state) {
+    case MCA_OOB_TCP_FREEZED:
+        opal_output_verbose(OOB_TCP_DEBUG_CONNECT, orte_oob_base_framework.framework_output,
+                            "%s tcp:send_handler freezed a send (%s)",
+                            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+	                        ORTE_NAME_PRINT(&peer->name));
+        /* de-activate the send event until migration completes */
+        if (peer->send_ev_active) {
+            opal_event_del(&peer->send_event);
+            peer->send_ev_active = false;
+        }
+        break;
+
     case MCA_OOB_TCP_CONNECTING:
     case MCA_OOB_TCP_CLOSED:
         opal_output_verbose(OOB_TCP_DEBUG_CONNECT, orte_oob_base_framework.framework_output,
