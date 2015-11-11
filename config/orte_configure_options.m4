@@ -113,4 +113,25 @@ AC_DEFINE_UNQUOTED([ORTE_ENABLE_STATIC_PORTS],
                    [$orte_enable_static_ports],
 		   [Whether we want static ports enabled])
 
+
+#
+# Do we want migration enabled?
+#
+
+AC_MSG_CHECKING([if want migration])
+AC_ARG_ENABLE([migration],
+    [AC_HELP_STRING([--enable-migration],
+                    [Enable migration capability (default: disabled)])])
+if test "$enable_migration" = "yes"; then
+    AC_MSG_RESULT([yes])
+    orte_want_migration=1
+else
+    AC_MSG_RESULT([no])
+    orte_want_migration=0
+fi
+AC_DEFINE_UNQUOTED([ORTE_ENABLE_MIGRATION],
+                   [$orte_want_migration],
+                   [Whether we want migration enabled])
+
+
 ])dnl
