@@ -66,7 +66,10 @@ typedef void (*mca_oob_tcp_module_ping_fn_t)(const orte_process_name_t *proc);
 typedef void (*mca_oob_tcp_module_send_nb_fn_t)(orte_rml_send_t *msg);
 typedef void (*mca_oob_tcp_module_resend_nb_fn_t)(struct mca_oob_tcp_msg_error_t *mop);
 typedef void (*mca_oob_tcp_module_ft_event_fn_t)(int state);
+
+#ifdef ORTE_ENABLE_MIG
 typedef void (*mca_oob_tcp_module_mig_event_fn_t)(int event, void* data);
+#endif
 
 typedef struct {
     mca_oob_tcp_module_init_fn_t               init;
@@ -77,7 +80,9 @@ typedef struct {
     mca_oob_tcp_module_send_nb_fn_t            send_nb;
     mca_oob_tcp_module_resend_nb_fn_t          resend;
     mca_oob_tcp_module_ft_event_fn_t           ft_event;
+#ifdef ORTE_ENABLE_MIG
     mca_oob_tcp_module_mig_event_fn_t          mig_event;
+#endif
 } mca_oob_tcp_module_api_t;
 typedef struct {
     mca_oob_tcp_module_api_t  api;
@@ -100,7 +105,9 @@ typedef enum {
     MCA_OOB_TCP_CONNECTED,
     MCA_OOB_TCP_FAILED,
     MCA_OOB_TCP_ACCEPTING,
+#ifdef ORTE_ENABLE_MIG
 	MCA_OOB_TCP_FREEZED		/* for migration */
+#endif
 } mca_oob_tcp_state_t;
 
 /* module-level shared functions */

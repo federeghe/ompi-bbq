@@ -131,6 +131,8 @@ void mca_oob_tcp_send_handler(int sd, short flags, void *cbdata)
                         ORTE_NAME_PRINT(&peer->name));
 
     switch (peer->state) {
+
+#if ORTE_ENABLE_MIG
     case MCA_OOB_TCP_FREEZED:
         opal_output_verbose(OOB_TCP_DEBUG_CONNECT, orte_oob_base_framework.framework_output,
                             "%s tcp:send_handler freezed a send (%s)",
@@ -142,7 +144,7 @@ void mca_oob_tcp_send_handler(int sd, short flags, void *cbdata)
             peer->send_ev_active = false;
         }
         break;
-
+#endif
     case MCA_OOB_TCP_CONNECTING:
     case MCA_OOB_TCP_CLOSED:
         opal_output_verbose(OOB_TCP_DEBUG_CONNECT, orte_oob_base_framework.framework_output,

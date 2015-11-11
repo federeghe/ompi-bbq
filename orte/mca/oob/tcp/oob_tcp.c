@@ -84,8 +84,11 @@ static void ping(const orte_process_name_t *proc);
 static void send_nb(orte_rml_send_t *msg);
 static void resend(struct mca_oob_tcp_msg_error_t *mop);
 static void ft_event(int state);
-static void mig_event(int event, void* data);
-static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest);
+
+#if ORTE_ENABLE_MIG
+	static void mig_event(int event, void* data);
+	static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest);
+#endif
 
 mca_oob_tcp_module_t mca_oob_tcp_module = {
     {
@@ -97,7 +100,10 @@ mca_oob_tcp_module_t mca_oob_tcp_module = {
         send_nb,
         resend,
         ft_event,
+#if ORTE_ENABLE_MIG
+
         mig_event
+#endif
     }
 };
 
@@ -455,6 +461,8 @@ static void process_send(int fd, short args, void *cbdata)
      */
     MCA_OOB_TCP_QUEUE_PENDING(op->msg, peer);
 
+#if ORTE_ENABLE_MIG
+
     if (MCA_OOB_TCP_FREEZED == peer->state) {
         /* The node is freezed so please wait */
         opal_output_verbose(2, orte_oob_base_framework.framework_output,
@@ -463,6 +471,8 @@ static void process_send(int fd, short args, void *cbdata)
                                     ORTE_NAME_PRINT(&peer->name));
         goto cleanup;
     }
+
+#endif
 
     if (MCA_OOB_TCP_CONNECTING != peer->state &&
         MCA_OOB_TCP_CONNECT_ACK != peer->state) {
@@ -531,6 +541,8 @@ static void process_resend(int fd, short args, void *cbdata)
         goto cleanup;
     }
 
+#if ORTE_ENABLE_MIG
+
     if (MCA_OOB_TCP_FREEZED == peer->state) {
         /* The node is freezed so please wait */
         opal_output_verbose(2, orte_oob_base_framework.framework_output,
@@ -539,6 +551,8 @@ static void process_resend(int fd, short args, void *cbdata)
                                     ORTE_NAME_PRINT(&peer->name));
         goto cleanup;
     }
+
+#endif
 
     if (MCA_OOB_TCP_CONNECTING != peer->state &&
         MCA_OOB_TCP_CONNECT_ACK != peer->state) {
@@ -709,6 +723,8 @@ static void ft_event(int state) {
 }
 #endif
 
+
+#if ORTE_ENABLE_MIG
 /**
  * Migration event handler.
  *
@@ -796,3 +812,5 @@ static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest) {
     ORTE_ACTIVATE_TCP_CONN_STATE(peer, mca_oob_tcp_peer_try_connect);
 
 }
+
+#endif
