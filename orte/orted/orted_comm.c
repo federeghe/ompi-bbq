@@ -113,6 +113,10 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     orte_proc_t *cur_proc = NULL, *prev_proc = NULL;
     bool found = false;
 
+#ifdef ORTE_ENABLE_MIG
+	orte_node_t *node;
+#endif
+
     /* unpack the command */
     n = 1;
     if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &command, &n, ORTE_DAEMON_CMD))) {
@@ -1083,7 +1087,34 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
             OBJ_RELEASE(answer);
         }
         break;
-        
+
+#ifdef ORTE_ENABLE_MIG
+
+    /* ** MIGRATION ** */
+    case ORTE_DAEMON_MIG_PREPARE:
+
+        if (orte_debug_daemons_flag) {
+            opal_output(0, "%s orted_recv: prepare for migration!",
+                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        }
+
+        n=1;
+        if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &node, &n, ORTE_NODE))) {
+            ORTE_ERROR_LOG(ret);
+            goto CLEANUP;
+        }
+
+
+        break;
+
+    case ORTE_DAEMON_MIG_EXEC:
+    case ORTE_DAEMON_MIG_DONE:
+        // Not implemented
+
+#endif
+
+    /* ** MIGRATION END ** */
+
     default:
         ORTE_ERROR_LOG(ORTE_ERR_BAD_PARAM);
     }

@@ -89,6 +89,11 @@ typedef uint8_t orte_daemon_cmd_flag_t;
 /* process called "errmgr.abort_procs" */
 #define ORTE_DAEMON_ABORT_PROCS_CALLED      (orte_daemon_cmd_flag_t) 28
 
+/* Migration commands */
+#define ORTE_DAEMON_MIG_PREPARE      		(orte_daemon_cmd_flag_t) 30
+#define ORTE_DAEMON_MIG_EXEC         		(orte_daemon_cmd_flag_t) 31
+#define ORTE_DAEMON_MIG_DONE         		(orte_daemon_cmd_flag_t) 32
+
 
 END_C_DECLS
 
