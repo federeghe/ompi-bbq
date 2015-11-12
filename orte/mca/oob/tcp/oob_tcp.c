@@ -88,6 +88,7 @@ static void ft_event(int state);
 #if ORTE_ENABLE_MIGRATION
 	static void mig_event(int event, void* data);
 	static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest);
+	static void mig_me(bool defreezing);
 #endif
 
 mca_oob_tcp_module_t mca_oob_tcp_module = {
@@ -733,6 +734,7 @@ static void ft_event(int state) {
  */
 static void mig_event(int event, void* data) {
     static mca_oob_tcp_peer_t *peer = NULL;
+    static orte_process_name_t peer_name;
 
     switch(event) {
 
@@ -743,15 +745,19 @@ static void mig_event(int event, void* data) {
             peer = mca_oob_tcp_peer_lookup((orte_process_name_t*)data);
             if (OPAL_UNLIKELY(peer == NULL)) {
                 // Error, no source peer found
-                opal_output (0, "oob_tcp_mig_event: Could not find process %i:%i for migration.\n",
+                opal_output (0, "%s:oob_tcp_mig_event: Could not find process %i:%i for migration.\n",
+                		ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
                         ((orte_process_name_t*)data)->jobid, ((orte_process_name_t*)data)->vpid);
                 ORTE_ERROR_LOG(ORTE_ERR_BAD_PARAM);
                 return;
             }
+            // Save the name for next use
+            peer_name.jobid = ((orte_process_name_t*)data)->jobid;
+            peer_name.vpid = ((orte_process_name_t*)data)->vpid;
         }
         else {
-            opal_output (0, "oob_tcp_mig_event: data==NULL.\n",
-                    ((orte_process_name_t*)data)->jobid, ((orte_process_name_t*)data)->vpid);
+            opal_output (0, "%s:oob_tcp_mig_event: data==NULL.\n",
+            			ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             ORTE_ERROR_LOG(ORTE_ERR_BAD_PARAM);
             return;
 
@@ -761,20 +767,37 @@ static void mig_event(int event, void* data) {
 
     case ORTE_MIG_EXEC:
 
-        // Freeze all pending send
-        peer->state = MCA_OOB_TCP_FREEZED;
+    	if (peer_name.jobid != ORTE_PROC_MY_NAME->jobid
+    		&& peer_name.vpid != ORTE_PROC_MY_NAME->vpid) {
 
+    		if (OPAL_UNLIKELY(!ORTE_PROC_IS_HNP)) {
+                opal_output (0, "%s:oob_tcp_mig_event: I'm not the migrating node nor the HNP,"
+                		"		 why the request of migrating to oob?\n",
+                			ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                ORTE_ERROR_LOG(ORTE_ERR_OPERATION_UNSUPPORTED);
+                return;
+    		}
 
-        mca_oob_tcp_peer_close(peer);
+    		// Freeze all pending send
+            peer->state = MCA_OOB_TCP_FREEZED;
 
-        /*
-         * It's not necessary to delete the peer from the hash table.
-         * proccess_uri (mig_done) will do this.
-         */
+            mca_oob_tcp_peer_close(peer);
+
+            /*
+             * It's not necessary to delete the peer from the hash table.
+             * proccess_uri (mig_done) will do this.
+             */
+            return;
+    	}
+
+		// Oh! Wow! I'm the migrating node!
+     	mig_me(false);
+
     break;
 
     case ORTE_MIG_DONE:
-        mig_done(peer, (const char*)data); //TODO
+        mig_done(peer, (const char*)data);
+        mig_me(true);
     break;
 
     default:
@@ -786,6 +809,52 @@ static void mig_event(int event, void* data) {
 
 }
 
+/**
+ * Freeze/Defreeze all connections for migrating node.
+ */
+static void mig_me(bool defreezing) {
+	uint64_t ui64;
+	char *nptr;
+	mca_oob_tcp_peer_t *peer_tmp;
+
+	// Let's freeze all peers
+
+    if (OPAL_SUCCESS == opal_hash_table_get_first_key_uint64(&mca_oob_tcp_module.peers, &ui64,
+                                                             (void**)&peer_tmp, (void**)&nptr)) {
+        opal_output_verbose(2, orte_oob_base_framework.framework_output,
+                            "%s FREEZING PEER OBJ %s",
+                            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                            (NULL == peer_tmp) ? "NULL" : ORTE_NAME_PRINT(&peer_tmp->name));
+        if (NULL != peer_tmp) {
+        	if (defreezing) {
+        		peer_tmp->state = MCA_OOB_TCP_FREEZED;
+        		mca_oob_tcp_peer_close(peer_tmp);
+        	} else {
+        	    // And now, reconnect!
+        		peer_tmp->state = MCA_OOB_TCP_CONNECTING;
+        	    ORTE_ACTIVATE_TCP_CONN_STATE(peer_tmp, mca_oob_tcp_peer_try_connect);
+        	}
+        }
+        while (OPAL_SUCCESS == opal_hash_table_get_next_key_uint64(&mca_oob_tcp_module.peers, &ui64,
+                                                                   (void**)&peer_tmp, nptr, (void**)&nptr)) {
+            opal_output_verbose(2, orte_oob_base_framework.framework_output,
+                                "%s RELEASING PEER OBJ %s",
+                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                                (NULL == peer_tmp) ? "NULL" : ORTE_NAME_PRINT(&peer_tmp->name));
+            if (NULL != peer_tmp) {
+            	if (defreezing) {
+            		peer_tmp->state = MCA_OOB_TCP_FREEZED;
+            		mca_oob_tcp_peer_close(peer_tmp);
+            	} else if(peer_tmp->state != MCA_OOB_TCP_CONNECTING) {
+            	    // And now, reconnect!
+            		peer_tmp->state = MCA_OOB_TCP_CONNECTING;
+            	    ORTE_ACTIVATE_TCP_CONN_STATE(peer_tmp, mca_oob_tcp_peer_try_connect);
+            	}
+            }
+        }
+    }
+
+}
 
 static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest) {
     char *peer_name=NULL;
