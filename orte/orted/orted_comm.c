@@ -113,7 +113,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     orte_proc_t *cur_proc = NULL, *prev_proc = NULL;
     bool found = false;
 
-#ifdef ORTE_ENABLE_MIG
+#ifdef ORTE_ENABLE_MIGRATION
 	orte_node_t *node;
 #endif
 
@@ -1088,7 +1088,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         }
         break;
 
-#ifdef ORTE_ENABLE_MIG
+#ifdef ORTE_ENABLE_MIGRATION
 
     /* ** MIGRATION ** */
     case ORTE_DAEMON_MIG_PREPARE:

@@ -217,7 +217,7 @@ char* mca_oob_tcp_state_print(mca_oob_tcp_state_t state)
         return "CONNECTED";
     case MCA_OOB_TCP_FAILED:
         return "FAILED";
-#if ORTE_ENABLE_MIG
+#if ORTE_ENABLE_MIGRATION
     case MCA_OOB_TCP_FREEZED:
 #endif
         return "FREEZED";

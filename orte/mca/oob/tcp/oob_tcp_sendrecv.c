@@ -132,7 +132,7 @@ void mca_oob_tcp_send_handler(int sd, short flags, void *cbdata)
 
     switch (peer->state) {
 
-#if ORTE_ENABLE_MIG
+#if ORTE_ENABLE_MIGRATION
     case MCA_OOB_TCP_FREEZED:
         opal_output_verbose(OOB_TCP_DEBUG_CONNECT, orte_oob_base_framework.framework_output,
                             "%s tcp:send_handler freezed a send (%s)",

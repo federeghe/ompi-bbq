@@ -67,7 +67,7 @@ typedef void (*mca_oob_tcp_module_send_nb_fn_t)(orte_rml_send_t *msg);
 typedef void (*mca_oob_tcp_module_resend_nb_fn_t)(struct mca_oob_tcp_msg_error_t *mop);
 typedef void (*mca_oob_tcp_module_ft_event_fn_t)(int state);
 
-#ifdef ORTE_ENABLE_MIG
+#ifdef ORTE_ENABLE_MIGRATION
 typedef void (*mca_oob_tcp_module_mig_event_fn_t)(int event, void* data);
 #endif
 
@@ -80,7 +80,7 @@ typedef struct {
     mca_oob_tcp_module_send_nb_fn_t            send_nb;
     mca_oob_tcp_module_resend_nb_fn_t          resend;
     mca_oob_tcp_module_ft_event_fn_t           ft_event;
-#ifdef ORTE_ENABLE_MIG
+#ifdef ORTE_ENABLE_MIGRATION
     mca_oob_tcp_module_mig_event_fn_t          mig_event;
 #endif
 } mca_oob_tcp_module_api_t;
@@ -105,7 +105,7 @@ typedef enum {
     MCA_OOB_TCP_CONNECTED,
     MCA_OOB_TCP_FAILED,
     MCA_OOB_TCP_ACCEPTING,
-#ifdef ORTE_ENABLE_MIG
+#ifdef ORTE_ENABLE_MIGRATION
 	MCA_OOB_TCP_FREEZED		/* for migration */
 #endif
 } mca_oob_tcp_state_t;

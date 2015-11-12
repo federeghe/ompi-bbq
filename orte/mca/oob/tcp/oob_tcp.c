@@ -85,7 +85,7 @@ static void send_nb(orte_rml_send_t *msg);
 static void resend(struct mca_oob_tcp_msg_error_t *mop);
 static void ft_event(int state);
 
-#if ORTE_ENABLE_MIG
+#if ORTE_ENABLE_MIGRATION
 	static void mig_event(int event, void* data);
 	static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest);
 #endif
@@ -100,7 +100,7 @@ mca_oob_tcp_module_t mca_oob_tcp_module = {
         send_nb,
         resend,
         ft_event,
-#if ORTE_ENABLE_MIG
+#if ORTE_ENABLE_MIGRATION
 
         mig_event
 #endif
@@ -461,7 +461,7 @@ static void process_send(int fd, short args, void *cbdata)
      */
     MCA_OOB_TCP_QUEUE_PENDING(op->msg, peer);
 
-#if ORTE_ENABLE_MIG
+#if ORTE_ENABLE_MIGRATION
 
     if (MCA_OOB_TCP_FREEZED == peer->state) {
         /* The node is freezed so please wait */
@@ -541,7 +541,7 @@ static void process_resend(int fd, short args, void *cbdata)
         goto cleanup;
     }
 
-#if ORTE_ENABLE_MIG
+#if ORTE_ENABLE_MIGRATION
 
     if (MCA_OOB_TCP_FREEZED == peer->state) {
         /* The node is freezed so please wait */
@@ -724,7 +724,7 @@ static void ft_event(int state) {
 #endif
 
 
-#if ORTE_ENABLE_MIG
+#if ORTE_ENABLE_MIGRATION
 /**
  * Migration event handler.
  *
@@ -734,14 +734,12 @@ static void ft_event(int state) {
 static void mig_event(int event, void* data) {
     static mca_oob_tcp_peer_t *peer = NULL;
 
-
-
     switch(event) {
 
     case ORTE_MIG_PREPARE:
 
         // Search the peer corresponding to that process name
-        if (data != NULL) {
+        if (OPAL_LIKELY(data != NULL)) {
             peer = mca_oob_tcp_peer_lookup((orte_process_name_t*)data);
             if (OPAL_UNLIKELY(peer == NULL)) {
                 // Error, no source peer found
@@ -751,29 +749,28 @@ static void mig_event(int event, void* data) {
                 return;
             }
         }
+        else {
+            opal_output (0, "oob_tcp_mig_event: data==NULL.\n",
+                    ((orte_process_name_t*)data)->jobid, ((orte_process_name_t*)data)->vpid);
+            ORTE_ERROR_LOG(ORTE_ERR_BAD_PARAM);
+            return;
 
-        // Freeze all pending send
-        peer->state = MCA_OOB_TCP_FREEZED;
+        }
 
     break;
 
     case ORTE_MIG_EXEC:
 
+        // Freeze all pending send
+        peer->state = MCA_OOB_TCP_FREEZED;
+
+
         mca_oob_tcp_peer_close(peer);
 
         /*
-         * XXX: It seems not necessary to delete the peer from the hash table.
-         *      Check necessary.
-         *
-        uint64_t ui64;
-
-        // Remove the old peer from the table
-        memcpy(&ui64, (char*)src, sizeof(uint64_t));
-        opal_hash_table_remove_value_uint64(&mca_oob_tcp_module.peers, ui64);
-
-        // It's not necessary to add the new one: when the new orted connects,
-        // the process_uri function is called and new node added.
-        */
+         * It's not necessary to delete the peer from the hash table.
+         * proccess_uri (mig_done) will do this.
+         */
     break;
 
     case ORTE_MIG_DONE:

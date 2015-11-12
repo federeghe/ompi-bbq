@@ -855,7 +855,7 @@ void mca_oob_tcp_peer_close(mca_oob_tcp_peer_t *peer)
     close(peer->sd);
     peer->sd = -1;
 
-#ifdef ORTE_ENABLE_MIG
+#ifdef ORTE_ENABLE_MIGRATION
     if (MCA_OOB_TCP_FREEZED == peer->state) {
         // Do nothing else, we must not inform the
         // component-level
