@@ -48,12 +48,15 @@ static int init(void);
 static int recv_data(int fd, short args, void *cbdata);
 static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes);
 static int finalize(void);
-static int send_cmd(int cmd);
 static int recv_nodes_reply(void);
 static void launch_job(void);
 static int recv_cmd(void);
 static int send_cmd_node_request(void);
 static int send_cmd_terminate(void);
+
+/* MIG-related function */
+static int migrate(void);
+static int send_cmd_migration_state(uint8_t state);
 
 /*
  * Global variable
@@ -152,7 +155,7 @@ static int recv_data(int fd, short args, void *cbdata)
             {
                 return ORTE_ERROR;
             }
-	        break;
+	    break;
         case BBQ_CMD_NODES_REPLY:
             /* We are receiving the node list from BBQ... */
             if(recv_nodes_reply())
@@ -160,7 +163,13 @@ static int recv_data(int fd, short args, void *cbdata)
                 return ORTE_ERROR;
             }
     	    break;
-    	    
+        case BBQ_CMD_MIGRATE:
+            /* We are receiving migration info from BBQ... */
+            if(migrate())
+            {
+                return ORTE_ERROR;
+            }
+            break;
         default:
             opal_output_verbose(0, orte_ras_base_framework.framework_output,
                 "%s ras:bbq:error: Invalid cmd_received state.",
@@ -180,7 +189,7 @@ static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes)
 {
     received_job=jdata;
     
-    send_cmd(BBQ_CMD_NODES_REQUEST);
+    send_cmd_node_request();
     
     /*
      * Since we have to wait for BBQ to send us the nodes list,
@@ -189,39 +198,10 @@ static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes)
     return ORTE_ERR_ALLOCATION_PENDING;
 }
 
-static int send_cmd(int cmd)
-{   
-    switch(cmd){
-        case BBQ_CMD_NODES_REQUEST:
-        {
-            if(send_cmd_node_request())
-            {
-                return ORTE_ERROR;
-            }
-            break;
-        }
-        case BBQ_CMD_TERMINATE:
-        {
-            if(send_cmd_terminate())
-            {
-                return ORTE_ERROR;
-            }
-            break;
-        }
-        default:
-        {
-            opal_output_verbose(0, orte_ras_base_framework.framework_output,
-                "%s ras:bbq:error: Invalid command.",
-                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-            return ORTE_ERROR;
-        }
-    }
-    return ORTE_SUCCESS;
-}
 
 static int finalize(void)
 {
-    send_cmd(BBQ_CMD_TERMINATE);
+    send_cmd_terminate();
     
     opal_event_del(&recv_ev);
     
@@ -318,6 +298,14 @@ static int recv_cmd(void){
             cmd_received=BBQ_CMD_NODES_REPLY;
             break;
         }
+        case BBQ_CMD_MIGRATE:
+        {
+            opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: BBQ sent command:BBQ_CMD_MIGRATE. Expecting migration info. ",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            cmd_received=BBQ_CMD_MIGRATE;
+            break;
+        }
         default:
         {
             opal_output_verbose(0, orte_ras_base_framework.framework_output,
@@ -341,8 +329,8 @@ static int send_cmd_node_request(void)
         command.flags |= BBQ_OPT_MIG_AVAILABLE;
     }
     
-    command.cmd_type=BBQ_CMD_NODES_REQUEST;
-    command.jobid=received_job->jobid;
+    command.cmd_type = BBQ_CMD_NODES_REQUEST;
+    command.jobid = received_job->jobid;
     
     opal_output_verbose(0, orte_ras_base_framework.framework_output,
                     "%s ras:bbq: Sending command BBQ_CMD_NODES_REQUEST.",
@@ -401,6 +389,82 @@ static int send_cmd_terminate(void)
     {
         opal_output_verbose(0, orte_ras_base_framework.framework_output,
             "%s ras:bbq:error: Error occurred while sending command BBQ_CMD_TERMINATE.",
+            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+    
+    return ORTE_SUCCESS;
+}
+
+static int migrate(void){
+    int bytes;
+    local_bbq_migrate_t info;
+    
+    bytes=read(socket_fd,&info,sizeof(local_bbq_migrate_t));
+    if(bytes!=sizeof(local_bbq_migrate_t))
+    {   
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: Error while reading migration info.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+    
+    if(NULL == info.dest || NULL == info.src){
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: Bad migration info. Aborted.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        
+        send_cmd_migration_state(BBQ_CMD_MIGRATION_ABORTED);
+        
+        return ORTE_ERROR;
+    }
+    
+    opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: Migration data received.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    
+    if (ORTE_SUCCESS != orte_mig_base.active_module->prepare_migration(received_job, info.src, info.dest)){
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: Error while preparing migration. Aborted.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        
+        send_cmd_migration_state(BBQ_CMD_MIGRATION_ABORTED);
+        
+        return ORTE_ERROR;
+    }
+    
+    if (ORTE_SUCCESS != orte_mig_base.active_module->migrate(received_job, info.src, info.dest)){
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: Error while performing migration. Aborted.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        
+        send_cmd_migration_state(BBQ_CMD_MIGRATION_ABORTED);
+        
+        return ORTE_ERROR;
+    }
+    
+    send_cmd_migration_state(BBQ_CMD_MIGRATION_SUCCEEDED);
+    
+    cmd_received = BBQ_CMD_NONE;
+    
+    return ORTE_SUCCESS;
+    
+}
+
+static int send_cmd_migration_state(uint8_t state){
+    local_bbq_cmd_t command;
+    
+    command.cmd_type = state;
+    command.jobid = received_job->jobid;
+    
+    opal_output_verbose(0, orte_ras_base_framework.framework_output,
+            "%s ras:bbq: Sending migration state to BBQ.",
+            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    
+    if(0>write(socket_fd,&command,sizeof(local_bbq_cmd_t)))
+    {
+        opal_output_verbose(0, orte_ras_base_framework.framework_output,
+            "%s ras:bbq:error: Error occurred while sending migration state to BBQ.",
             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }

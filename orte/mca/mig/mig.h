@@ -26,12 +26,17 @@ BEGIN_C_DECLS
 /* Initialize the module */
 typedef int (*orte_mig_base_module_init_fn_t)(void);
 
+/* Prepares node migration */
+typedef int (*orte_mig_base_module_prepare_migration_fn_t)(orte_job_t *jdata,
+                                                  char *src_name,
+                                                  char *dest_name);
+
 /**
  * Start process migration.
  */
 typedef int (*orte_mig_base_module_migrate_fn_t)(orte_job_t *jdata,
-                                                  orte_node_t *src,
-                                                  orte_node_t *dest);
+                                                  char *src_name,
+                                                  char *dest_name);
 
 
 /**
@@ -45,6 +50,8 @@ typedef int (*orte_mig_base_module_finalize_fn_t)(void);
 struct orte_mig_base_module_2_0_0_t {
     /** Initialization function pointer */
     orte_mig_base_module_init_fn_t          init;
+    /** Prepare migration function pointer */
+    orte_mig_base_module_prepare_migration_fn_t prepare_migration;
     /** Migration function pointer */
     orte_mig_base_module_migrate_fn_t      migrate;
     /** Finalize function pointer */

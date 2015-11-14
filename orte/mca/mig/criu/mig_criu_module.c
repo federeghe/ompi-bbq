@@ -42,9 +42,12 @@
 #include "orte/mca/mig/mig_types.h"
 
 static int init(void);
+static int orte_mig_criu_prepare_migration(orte_job_t *jdata,
+                                char *src_name,
+                                char *dest_name);
 static int orte_mig_criu_migrate(orte_job_t *jdata,
-                                orte_node_t *src,
-                                orte_node_t *dest);
+                                char *src_name,
+                                char *dest_name);
 static int orte_mig_criu_finalize(void);
 
 /*
@@ -52,6 +55,7 @@ static int orte_mig_criu_finalize(void);
  */
 orte_mig_base_module_t orte_mig_criu_module = {
     init,
+    orte_mig_criu_prepare_migration,
     orte_mig_criu_migrate,
     orte_mig_criu_finalize,
 };
@@ -59,12 +63,15 @@ orte_mig_base_module_t orte_mig_criu_module = {
 static int init(void){
     /*TODO: checks to flag us as available*/
     orte_mig_base.active_module->state = MIG_AVAILABLE;
+    opal_output_verbose(0, orte_mig_base_framework.framework_output,
+                "%s mig:criu: Criu module initialized.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     return ORTE_SUCCESS;
 }
 
 static int orte_mig_criu_migrate(orte_job_t *jdata,
-                                orte_node_t *src,
-                                orte_node_t *dest){
+                                char *src_name,
+                                char *dest_name){
     return ORTE_SUCCESS;
 }
 
