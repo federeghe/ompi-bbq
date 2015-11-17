@@ -303,7 +303,7 @@ static int recv_cmd(void){
             opal_output_verbose(0, orte_ras_base_framework.framework_output,
                 "%s ras:bbq: BBQ sent command:BBQ_CMD_MIGRATE. Expecting migration info. ",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-            cmd_received=BBQ_CMD_MIGRATE;
+            cmd_received = BBQ_CMD_MIGRATE;
             break;
         }
         default:
@@ -423,27 +423,7 @@ static int migrate(void){
                 "%s ras:bbq: Migration data received.",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
-    if (ORTE_SUCCESS != orte_mig_base.active_module->prepare_migration(received_job, info.src, info.dest)){
-        opal_output_verbose(0, orte_ras_base_framework.framework_output,
-                "%s ras:bbq: Error while preparing migration. Aborted.",
-                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-        
-        send_cmd_migration_state(BBQ_CMD_MIGRATION_ABORTED);
-        
-        return ORTE_ERROR;
-    }
-    
-    if (ORTE_SUCCESS != orte_mig_base.active_module->migrate(received_job, info.src, info.dest)){
-        opal_output_verbose(0, orte_ras_base_framework.framework_output,
-                "%s ras:bbq: Error while performing migration. Aborted.",
-                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-        
-        send_cmd_migration_state(BBQ_CMD_MIGRATION_ABORTED);
-        
-        return ORTE_ERROR;
-    }
-    
-    send_cmd_migration_state(BBQ_CMD_MIGRATION_SUCCEEDED);
+    orte_mig_base.active_module->prepare_migration(received_job, info.src, info.dest);
     
     cmd_received = BBQ_CMD_NONE;
     
@@ -467,6 +447,10 @@ static int send_cmd_migration_state(uint8_t state){
             "%s ras:bbq:error: Error occurred while sending migration state to BBQ.",
             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
+    }
+    
+    if(BBQ_CMD_MIGRATION_PREPARED == state){
+        orte_mig_base.active_module->migrate();
     }
     
     return ORTE_SUCCESS;

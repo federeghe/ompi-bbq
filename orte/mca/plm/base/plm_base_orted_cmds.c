@@ -229,3 +229,54 @@ int orte_plm_base_orted_signal_local_procs(orte_jobid_t job, int32_t signal)
     /* we're done! */
     return ORTE_SUCCESS;
 }
+
+#if ORTE_ENABLE_MIGRATION
+int orte_plm_base_orted_prepare_migration(orte_jobid_t job, char* src_name, char* dest_name){
+    int rc;
+    opal_buffer_t cmd;
+    orte_daemon_cmd_flag_t command = ORTE_DAEMON_MIG_PREPARE;
+    
+    OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
+                         "%s plm:base:orted_cmd sending migration signal",
+                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME)));
+    
+    OBJ_CONSTRUCT(&cmd, opal_buffer_t);
+    
+    /* pack the command */
+    if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, &command, 1, ORTE_DAEMON_CMD))) {
+        ORTE_ERROR_LOG(rc);
+        OBJ_DESTRUCT(&cmd);
+        return rc;
+    }
+    
+    /* pack the jobid */
+    if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, &job, 1, ORTE_JOBID))) {
+        ORTE_ERROR_LOG(rc);
+        OBJ_DESTRUCT(&cmd);
+        return rc;
+    }
+    
+    /* pack the source node name */
+    if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, src_name, 1, ORTE_NAME))) {
+        ORTE_ERROR_LOG(rc);
+        OBJ_DESTRUCT(&cmd);
+        return rc;
+    }
+    
+    /* pack the destination node name */
+    if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, dest_name , 1, ORTE_NAME))) {
+        ORTE_ERROR_LOG(rc);
+        OBJ_DESTRUCT(&cmd);
+        return rc;
+    }
+    
+    /* send it! */
+    if (ORTE_SUCCESS != (rc = orte_grpcomm.xcast(ORTE_PROC_MY_NAME->jobid, &cmd, ORTE_RML_TAG_DAEMON))) {
+        ORTE_ERROR_LOG(rc);
+    }
+    OBJ_DESTRUCT(&cmd);
+    
+    /* we're done! */
+    return ORTE_SUCCESS;
+}
+#endif

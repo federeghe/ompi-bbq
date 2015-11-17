@@ -36,6 +36,8 @@
 #include "orte/runtime/orte_globals.h"
 #include "orte/util/name_fns.h"
 #include "orte/mca/rmaps/base/base.h"
+#include "orte/runtime/orte_globals.h"
+#include "orte/mca/plm/plm.h"
 
 #include "mig_criu.h"
 #include "orte/mca/mig/base/base.h"
@@ -45,14 +47,17 @@ static int init(void);
 static int orte_mig_criu_prepare_migration(orte_job_t *jdata,
                                 char *src_name,
                                 char *dest_name);
-static int orte_mig_criu_migrate(orte_job_t *jdata,
-                                char *src_name,
-                                char *dest_name);
+static int orte_mig_criu_migrate(void);
 static int orte_mig_criu_finalize(void);
 
 /*
- * Global variable
+ * Global variables
  */
+
+char src[256];
+char dest[256];
+orte_job_t *job;
+
 orte_mig_base_module_t orte_mig_criu_module = {
     init,
     orte_mig_criu_prepare_migration,
@@ -69,12 +74,29 @@ static int init(void){
     return ORTE_SUCCESS;
 }
 
-static int orte_mig_criu_migrate(orte_job_t *jdata,
+static int orte_mig_criu_prepare_migration(orte_job_t *jdata,
                                 char *src_name,
                                 char *dest_name){
+    /* Save migration data locally */
+    /*
+    memcpy(src, src_name, 256*sizeof(char));
+    memcpy(dest, dest_name, 256*sizeof(char));
+    job = jdata;
+    */
+    /* TODO ?:Check if received node are contained in the list */
+    
+    orte_plm.migrate(jdata->jobid, src_name, dest_name);
+    
+    
+    
+}
+
+static int orte_mig_criu_migrate(){
     return ORTE_SUCCESS;
 }
 
 static int orte_mig_criu_finalize(void){
     return ORTE_SUCCESS;
 }
+
+static int recv_ack(int fd, short args, void *cbdata){}

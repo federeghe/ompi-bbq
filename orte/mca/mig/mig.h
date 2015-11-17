@@ -34,9 +34,7 @@ typedef int (*orte_mig_base_module_prepare_migration_fn_t)(orte_job_t *jdata,
 /**
  * Start process migration.
  */
-typedef int (*orte_mig_base_module_migrate_fn_t)(orte_job_t *jdata,
-                                                  char *src_name,
-                                                  char *dest_name);
+typedef int (*orte_mig_base_module_migrate_fn_t)(void);
 
 
 /**
