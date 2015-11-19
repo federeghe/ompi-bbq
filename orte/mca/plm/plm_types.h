@@ -223,6 +223,17 @@ typedef uint8_t orte_plm_cmd_flag_t;
 #define ORTE_PLM_UPDATE_PROC_STATE      2
 #define ORTE_PLM_INIT_ROUTES_CMD        3
 
+#if ORTE_ENABLE_MIGRATION
+#define ORTE_PLM_MIGRATION_CMD          4
+
+/* PLM migration flags*/
+#define ORTE_MIG_PREPARE_ACK_FLAG       1
+#define ORTE_MIG_READY_FLAG             2
+#define ORTE_MIG_DONE_FLAG              3
+#endif
+
+
+
 END_C_DECLS
 
 #endif

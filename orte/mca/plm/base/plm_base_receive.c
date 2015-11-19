@@ -59,12 +59,14 @@
 #include "orte/mca/plm/base/base.h"
 
 static bool recv_issued=false;
+static int ack_count = 0;
 
 int orte_plm_base_comm_start(void)
 {
     if (recv_issued) {
         return ORTE_SUCCESS;
     }
+    
     
     OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
                          "%s plm:base:receive start comm",
@@ -84,6 +86,12 @@ int orte_plm_base_comm_start(void)
                                 ORTE_RML_TAG_REPORT_REMOTE_LAUNCH,
                                 ORTE_RML_PERSISTENT,
                                 orte_plm_base_daemon_failed, NULL);
+#if ORTE_ENABLE_MIGRATION
+        orte_rml.recv_buffer_nb(ORTE_NAME_WILDCARD,
+                                ORTE_RML_TAG_MIGRATION_ACK,
+                                ORTE_RML_PERSISTENT,
+                                orte_plm_base_recv, NULL);
+#endif
     }
     recv_issued = true;
     
@@ -383,7 +391,37 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
             ORTE_FORCED_TERMINATE(ORTE_ERROR_DEFAULT_EXIT_CODE);
         }
         break;
-
+#if ORTE_ENABLE_MIGRATION
+    case ORTE_PLM_MIGRATION_CMD:
+        count = 1;
+        if (ORTE_SUCCESS != (rc = opal_dss.unpack(buffer, &flag, &count, OPAL_UINT8))) {
+            ORTE_ERROR_LOG(rc);
+            goto DEPART;
+        }
+        switch(flag){
+        /* Messages sent from daemons telling us they're aware of the imminent migration */
+        case ORTE_MIG_PREPARE_ACK_FLAG:
+            if (orte_node_pool->size == ++ack_count){
+                    //TODO: notify BBQ that we received all acknowledgments
+            }
+            break;
+        
+        /* Daemon is ready to migrate */
+        case ORTE_MIG_READY_FLAG:
+            //TODO
+            break;
+        
+        /* Daemon has finished migrating */
+        case ORTE_MIG_DONE_FLAG:
+            //TODO
+            break;
+            
+        default:
+            ORTE_ERROR_LOG(ORTE_ERR_VALUE_OUT_OF_BOUNDS);
+            rc = ORTE_ERR_VALUE_OUT_OF_BOUNDS;
+            break;
+        }    
+#endif
     default:
         ORTE_ERROR_LOG(ORTE_ERR_VALUE_OUT_OF_BOUNDS);
         rc = ORTE_ERR_VALUE_OUT_OF_BOUNDS;

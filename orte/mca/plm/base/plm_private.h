@@ -95,6 +95,9 @@ ORTE_DECLSPEC int orte_plm_base_orted_terminate_job(orte_jobid_t jobid);
 ORTE_DECLSPEC int orte_plm_base_orted_kill_local_procs(opal_pointer_array_t *procs);
 ORTE_DECLSPEC int orte_plm_base_orted_signal_local_procs(orte_jobid_t job, int32_t signal);
 
+#if ORTE_ENABLE_MIGRATION
+ORTE_DECLSPEC int orte_plm_base_orted_prepare_migration(orte_jobid_t job, char* src_name, char* dest_name);
+#endif
 /*
  * communications utilities
  */

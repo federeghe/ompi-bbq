@@ -97,6 +97,13 @@ typedef int (*orte_plm_base_module_terminate_procs_fn_t)(opal_pointer_array_t *p
  */
 typedef int (*orte_plm_base_module_signal_job_fn_t)(orte_jobid_t, int32_t);
 
+#if ORTE_ENABLE_MIGRATION
+/**
+ * Manages process migration
+ */
+typedef int (*orte_plm_base_module_prepare_migration_fn_t)(orte_jobid_t, char* src_name, char* dest_name);
+#endif
+
 /**
  * plm module version 1.0.0
  */
@@ -109,6 +116,9 @@ struct orte_plm_base_module_1_0_0_t {
     orte_plm_base_module_terminate_orteds_fn_t   terminate_orteds;
     orte_plm_base_module_terminate_procs_fn_t    terminate_procs;
     orte_plm_base_module_signal_job_fn_t         signal_job;
+#if ORTE_ENABLE_MIGRATION
+    orte_plm_base_module_prepare_migration_fn_t  migrate;
+#endif
     orte_plm_base_module_finalize_fn_t           finalize;
 };
 

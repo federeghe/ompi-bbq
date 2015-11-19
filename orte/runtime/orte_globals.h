@@ -369,6 +369,11 @@ typedef struct {
     /* system topology for this node */
     hwloc_topology_t topology;
 #endif
+
+#if ORTE_ENABLE_MIGRATION
+    /* Node sent back acknowledgment for migration */
+    bool ack;
+#endif
     /* history of resource usage - sized by sensor framework */
     opal_ring_buffer_t stats;
 } orte_node_t;

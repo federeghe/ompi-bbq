@@ -1092,7 +1092,6 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
     /* ** MIGRATION ** */
     case ORTE_DAEMON_MIG_PREPARE:
-
         if (orte_debug_daemons_flag) {
             opal_output(0, "%s orted_recv: prepare for migration!",
                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
