@@ -60,9 +60,10 @@ static int orte_mig_criu_finalize(void);
  * Global variables
  */
 
-char src[256];
-char dest[256];
-orte_job_t *job;
+char mig_src[256];
+char mig_dest[256];
+orte_job_t *mig_job;
+orte_process_name_t mig_orted;
 
 orte_mig_base_module_t orte_mig_criu_module = {
     init,
@@ -85,16 +86,33 @@ static int orte_mig_criu_prepare_migration(orte_job_t *jdata,
                                 char *src_name,
                                 char *dest_name){
     /* Save migration data locally */
-    /*
-    memcpy(src, src_name, 256*sizeof(char));
-    memcpy(dest, dest_name, 256*sizeof(char));
-    job = jdata;
-    */
-    /* TODO ?:Check if received node are contained in the list */
+
+    strcpy(mig_src, src_name);
+    strcpy(mig_dest, dest_name);
+    mig_job = jdata;
+
+
+	// Search the source node in the pool, so we can get the info of orted.
+	int i=0;
+	orte_node_t* node;
+	while ((node = opal_pointer_array_get_item(orte_node_pool, i)) != NULL) {
+		if (strcmp(node->name, src) == 0)
+			break;
+		i++;
+	}
+
+	if (OPAL_UNLIKELY(node == NULL)) {
+		opal_output_verbose(10, orte_mig_base_framework.framework_output,
+		                "%s mig:criu: Error: source node not found.",
+		                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+		return ORTE_ERROR;
+	}
+
+	mig_orted = node->daemon->name;
+
+
+    orte_plm.mig_event(ORTE_MIG_PREPARE, NULL);
     
-    orte_plm.prepare_migration(jdata->jobid, src_name, dest_name);
-    
-    return ORTE_SUCCESS;
 }
 
 static int orte_mig_criu_migrate(){
