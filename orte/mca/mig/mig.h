@@ -36,6 +36,11 @@ typedef int (*orte_mig_base_module_prepare_migration_fn_t)(orte_job_t *jdata,
  */
 typedef int (*orte_mig_base_module_migrate_fn_t)(void);
 
+/**
+ * Forwards migration info to the framework communicating with resources manager
+ */
+typedef int (*orte_mig_base_module_fwd_info_fn_t)(uint8_t flag);
+
 
 /**
  *  Finalize the module
@@ -50,8 +55,10 @@ struct orte_mig_base_module_2_0_0_t {
     orte_mig_base_module_init_fn_t          init;
     /** Prepare migration function pointer */
     orte_mig_base_module_prepare_migration_fn_t prepare_migration;
-    /** Migration function pointer */
+    /** Migrate function pointer */
     orte_mig_base_module_migrate_fn_t      migrate;
+    /** Forward info function pointer */
+    orte_mig_base_module_fwd_info_fn_t      fwd_info;
     /** Finalize function pointer */
     orte_mig_base_module_finalize_fn_t      finalize;
     /** State of the active module, may be needed*/

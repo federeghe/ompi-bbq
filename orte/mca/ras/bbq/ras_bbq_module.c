@@ -56,7 +56,7 @@ static int send_cmd_terminate(void);
 
 /* MIG-related function */
 static int migrate(void);
-static int send_cmd_migration_state(uint8_t state);
+static int send_mig_info(uint8_t state);
 
 /*
  * Global variable
@@ -65,6 +65,7 @@ orte_ras_base_module_t orte_ras_bbq_module = {
     init,
     orte_ras_bbq_allocate,
     NULL,
+    send_mig_info,
     finalize
 };
 
@@ -187,6 +188,7 @@ static int recv_data(int fd, short args, void *cbdata)
 
 static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes)
 {
+    printf("+++++++++ ALLOCATE\n");
     received_job=jdata;
     
     send_cmd_node_request();
@@ -329,6 +331,7 @@ static int send_cmd_node_request(void)
         command.flags |= BBQ_OPT_MIG_AVAILABLE;
     }
     
+    printf("+++++++++ SENDING NODE REQUEST\n");
     command.cmd_type = BBQ_CMD_NODES_REQUEST;
     command.jobid = received_job->jobid;
     
@@ -344,6 +347,8 @@ static int send_cmd_node_request(void)
             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
+    
+    printf("++++++++ COMMAND SENT\n");
 
     job.jobid=received_job->jobid;
     
@@ -367,6 +372,7 @@ static int send_cmd_node_request(void)
         return ORTE_ERROR;
     }
 
+    printf("+++++++ REQUEST SENT\n");
     opal_output_verbose(0, orte_ras_base_framework.framework_output,
         "%s ras:bbq: Requested %u slots for job %u.",
         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),job.slots_requested,job.jobid);
@@ -414,7 +420,7 @@ static int migrate(void){
                 "%s ras:bbq: Bad migration info. Aborted.",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         
-        send_cmd_migration_state(BBQ_CMD_MIGRATION_ABORTED);
+        send_mig_info(BBQ_CMD_MIGRATION_ABORTED);
         
         return ORTE_ERROR;
     }
@@ -431,7 +437,7 @@ static int migrate(void){
     
 }
 
-static int send_cmd_migration_state(uint8_t state){
+static int send_mig_info(uint8_t state){
     local_bbq_cmd_t command;
     
     command.cmd_type = state;
@@ -447,10 +453,6 @@ static int send_cmd_migration_state(uint8_t state){
             "%s ras:bbq:error: Error occurred while sending migration state to BBQ.",
             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
-    }
-    
-    if(BBQ_CMD_MIGRATION_PREPARED == state){
-        orte_mig_base.active_module->migrate();
     }
     
     return ORTE_SUCCESS;

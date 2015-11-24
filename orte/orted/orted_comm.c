@@ -112,11 +112,13 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     orte_std_cntr_t num_procs, num_new_procs = 0, p;
     orte_proc_t *cur_proc = NULL, *prev_proc = NULL;
     bool found = false;
+    uint8_t flag;
+    char hostname[256];
+    FILE *fd;
 
 #ifdef ORTE_ENABLE_MIGRATION
 	orte_node_t *node;
 #endif
-
     /* unpack the command */
     n = 1;
     if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &command, &n, ORTE_DAEMON_CMD))) {
@@ -523,7 +525,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         }
         break;
             
-        /****     CONTACT QUERY COMMAND    ****/
+        /****     CONTACT QUERY COMMAND   ****/
     case ORTE_DAEMON_CONTACT_QUERY_CMD:
         if (orte_debug_daemons_flag) {
             opal_output(0, "%s orted_cmd: received contact query",
@@ -547,7 +549,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         }
             
         if (0 > (ret = orte_rml.send_buffer_nb(sender, answer, ORTE_RML_TAG_TOOL,
-                                               orte_rml_send_callback, NULL))) {
+                                               NULL, NULL))) {
             ORTE_ERROR_LOG(ret);
             OBJ_RELEASE(answer);
         }
@@ -1092,24 +1094,42 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
     /* ** MIGRATION ** */
     case ORTE_DAEMON_MIG_PREPARE:
-        if (orte_debug_daemons_flag) {
-            opal_output(0, "%s orted_recv: prepare for migration!",
-                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        
+        answer = OBJ_NEW(opal_buffer_t);
+        command = ORTE_PLM_MIGRATION_CMD;
+        flag = ORTE_MIG_PREPARE_ACK_FLAG;
+        
+        if (ORTE_SUCCESS != (ret = opal_dss.pack(answer, &command, 1, ORTE_PLM_CMD))) {
+            ORTE_ERROR_LOG(ret);
+            OBJ_RELEASE(relay_msg);
         }
-
+        
+        if(ORTE_SUCCESS != (ret = opal_dss.pack(answer, &flag, 1, OPAL_UINT8))){
+            ORTE_ERROR_LOG(ret);
+            OBJ_RELEASE(relay_msg);
+        }
+        
+        if (0 > (ret = orte_rml.send_buffer_nb(ORTE_PROC_MY_HNP, answer, ORTE_RML_TAG_MIGRATION_ACK,
+                                                   orte_rml_send_callback, NULL))) {
+            ORTE_ERROR_LOG(ret);
+            OBJ_RELEASE(answer);
+        }
+        
+        //TODO: Switching to migration-aware state 
+        
+        /*
         n=1;
         if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &node, &n, ORTE_NODE))) {
             ORTE_ERROR_LOG(ret);
             goto CLEANUP;
         }
-
-
+        */
         break;
-
     case ORTE_DAEMON_MIG_EXEC:
+        break;
     case ORTE_DAEMON_MIG_DONE:
-        // Not implemented
-
+        break;
+    break;
 #endif
 
     /* ** MIGRATION END ** */
@@ -1175,7 +1195,10 @@ static char *get_orted_comm_cmd_str(int command)
 
     case ORTE_DAEMON_ABORT_PROCS_CALLED:
         return strdup("ORTE_DAEMON_ABORT_PROCS_CALLED");
-
+        
+    case ORTE_DAEMON_MIG_PREPARE:
+        return strdup("ORTE_DAEMON_MIG_PREPARE");
+        
     default:
         return strdup("Unknown Command!");
     }

@@ -58,6 +58,10 @@
 #include "orte/mca/plm/base/plm_private.h"
 #include "orte/mca/plm/base/base.h"
 
+#if ORTE_ENABLE_MIGRATION
+#include "orte/mca/mig/base/base.h"
+#endif
+
 static bool recv_issued=false;
 static int ack_count = 0;
 
@@ -393,16 +397,17 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
         break;
 #if ORTE_ENABLE_MIGRATION
     case ORTE_PLM_MIGRATION_CMD:
+        
         count = 1;
         if (ORTE_SUCCESS != (rc = opal_dss.unpack(buffer, &flag, &count, OPAL_UINT8))) {
             ORTE_ERROR_LOG(rc);
-            goto DEPART;
         }
+        
         switch(flag){
         /* Messages sent from daemons telling us they're aware of the imminent migration */
         case ORTE_MIG_PREPARE_ACK_FLAG:
-            if (orte_node_pool->size == ++ack_count){
-                    //TODO: notify BBQ that we received all acknowledgments
+            if (orte_node_pool->size - orte_node_pool->number_free == ++ack_count){
+                orte_mig_base.active_module->fwd_info(flag);
             }
             break;
         
@@ -417,11 +422,11 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
             break;
             
         default:
-            ORTE_ERROR_LOG(ORTE_ERR_VALUE_OUT_OF_BOUNDS);
-            rc = ORTE_ERR_VALUE_OUT_OF_BOUNDS;
             break;
-        }    
+        }
+        break;
 #endif
+    
     default:
         ORTE_ERROR_LOG(ORTE_ERR_VALUE_OUT_OF_BOUNDS);
         rc = ORTE_ERR_VALUE_OUT_OF_BOUNDS;
@@ -431,15 +436,13 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
  CLEANUP:
     if (ORTE_SUCCESS != rc) {
         goto DEPART;
-    }
-        
+    }  
  DEPART:
     /* see if an error occurred - if so, wakeup the HNP so we can exit */
     if (ORTE_PROC_IS_HNP && ORTE_SUCCESS != rc) {
         jdata = NULL;
         ORTE_FORCED_TERMINATE(ORTE_ERROR_DEFAULT_EXIT_CODE);
     }
-    
     OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
                          "%s plm:base:receive done processing commands",
                          ORTE_NAME_PRINT(ORTE_PROC_MY_NAME)));

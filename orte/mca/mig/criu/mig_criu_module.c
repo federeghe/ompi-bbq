@@ -38,16 +38,22 @@
 #include "orte/mca/rmaps/base/base.h"
 #include "orte/runtime/orte_globals.h"
 #include "orte/mca/plm/plm.h"
+#include "orte/mca/plm/plm_types.h"
 
 #include "mig_criu.h"
 #include "orte/mca/mig/base/base.h"
 #include "orte/mca/mig/mig_types.h"
+
+#include "orte/mca/ras/bbq/bbq_ompi_types.h"
+#include "orte/mca/ras/ras.h"
+#include "orte/mca/ras/base/base.h"
 
 static int init(void);
 static int orte_mig_criu_prepare_migration(orte_job_t *jdata,
                                 char *src_name,
                                 char *dest_name);
 static int orte_mig_criu_migrate(void);
+static int orte_mig_criu_fwd_info(uint8_t flag);
 static int orte_mig_criu_finalize(void);
 
 /*
@@ -62,6 +68,7 @@ orte_mig_base_module_t orte_mig_criu_module = {
     init,
     orte_mig_criu_prepare_migration,
     orte_mig_criu_migrate,
+    orte_mig_criu_fwd_info,
     orte_mig_criu_finalize,
 };
 
@@ -85,18 +92,28 @@ static int orte_mig_criu_prepare_migration(orte_job_t *jdata,
     */
     /* TODO ?:Check if received node are contained in the list */
     
-    orte_plm.migrate(jdata->jobid, src_name, dest_name);
+    orte_plm.prepare_migration(jdata->jobid, src_name, dest_name);
     
-    
-    
+    return ORTE_SUCCESS;
 }
 
 static int orte_mig_criu_migrate(){
     return ORTE_SUCCESS;
 }
 
-static int orte_mig_criu_finalize(void){
+static int orte_mig_criu_fwd_info(uint8_t flag){
+    switch(flag){
+        case ORTE_MIG_PREPARE_ACK_FLAG:
+            orte_ras_base.active_module->send_mig_info(BBQ_CMD_MIGRATION_READY);
+            break;
+        default:
+            opal_output_verbose(0, orte_mig_base_framework.framework_output,
+                "%s mig:criu: Unknown message to forward.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    }
     return ORTE_SUCCESS;
 }
 
-static int recv_ack(int fd, short args, void *cbdata){}
+static int orte_mig_criu_finalize(void){
+    return ORTE_SUCCESS;
+}

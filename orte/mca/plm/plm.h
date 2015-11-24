@@ -117,7 +117,7 @@ struct orte_plm_base_module_1_0_0_t {
     orte_plm_base_module_terminate_procs_fn_t    terminate_procs;
     orte_plm_base_module_signal_job_fn_t         signal_job;
 #if ORTE_ENABLE_MIGRATION
-    orte_plm_base_module_prepare_migration_fn_t  migrate;
+    orte_plm_base_module_prepare_migration_fn_t  prepare_migration;
 #endif
     orte_plm_base_module_finalize_fn_t           finalize;
 };
