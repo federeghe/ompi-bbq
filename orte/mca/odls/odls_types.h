@@ -94,6 +94,7 @@ typedef uint8_t orte_daemon_cmd_flag_t;
 #define ORTE_DAEMON_MIG_PREPARE      		(orte_daemon_cmd_flag_t) 30
 #define ORTE_DAEMON_MIG_EXEC         		(orte_daemon_cmd_flag_t) 31
 #define ORTE_DAEMON_MIG_DONE         		(orte_daemon_cmd_flag_t) 32
+
 #endif
 
 END_C_DECLS

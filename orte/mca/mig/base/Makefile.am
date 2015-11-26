@@ -12,5 +12,6 @@ headers += \
 
 libmca_mig_la_SOURCES += \
         base/mig_base_select.c \
-        base/mig_base_frame.c
+        base/mig_base_frame.c \
+	base/mig_base.c
 

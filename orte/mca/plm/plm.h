@@ -99,9 +99,9 @@ typedef int (*orte_plm_base_module_signal_job_fn_t)(orte_jobid_t, int32_t);
 
 #if ORTE_ENABLE_MIGRATION
 /**
- * Manages process migration
+ * Migration event
  */
-typedef int (*orte_plm_base_module_prepare_migration_fn_t)(orte_jobid_t, char* src_name, char* dest_name);
+typedef int (*orte_plm_base_module_mig_event_fn_t)(int event, void *data);
 #endif
 
 /**
@@ -117,7 +117,7 @@ struct orte_plm_base_module_1_0_0_t {
     orte_plm_base_module_terminate_procs_fn_t    terminate_procs;
     orte_plm_base_module_signal_job_fn_t         signal_job;
 #if ORTE_ENABLE_MIGRATION
-    orte_plm_base_module_prepare_migration_fn_t  prepare_migration;
+    orte_plm_base_module_mig_event_fn_t          mig_event;
 #endif
     orte_plm_base_module_finalize_fn_t           finalize;
 };

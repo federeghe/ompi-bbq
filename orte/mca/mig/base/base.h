@@ -25,6 +25,13 @@ ORTE_DECLSPEC extern mca_base_framework_t orte_mig_base_framework;
 /* select a component */
 ORTE_DECLSPEC int orte_mig_base_select(void);
 
+/* Functions that have to be accessible from modules */
+ORTE_DECLSPEC int orte_mig_base_prepare_migration(orte_job_t *jdata,
+                                            char *src_name,
+                                            char *dest_name);
+
+ORTE_DECLSPEC int orte_mig_base_fwd_info(int flag);
+
 /*
  * globals that might be needed
  */

@@ -51,6 +51,10 @@
 #include "orte/mca/plm/base/base.h"
 #include "orte/mca/plm/base/plm_private.h"
 
+#if ORTE_ENABLE_MIGRATION
+#include "orte/mca/mig/mig_types.h"
+#endif
+
 #if 0
 static void failed_cmd(int fd, short event, void *cbdata)
 {
@@ -231,43 +235,40 @@ int orte_plm_base_orted_signal_local_procs(orte_jobid_t job, int32_t signal)
 }
 
 #if ORTE_ENABLE_MIGRATION
-int orte_plm_base_orted_prepare_migration(orte_jobid_t job, char* src_name, char* dest_name){
+int orte_plm_mig_event(int event, void *data){
     int rc;
     opal_buffer_t cmd;
-    orte_daemon_cmd_flag_t command = ORTE_DAEMON_MIG_PREPARE;
+    orte_daemon_cmd_flag_t command;
     
-    OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
-                         "%s plm:base:orted_cmd sending migration signal",
+    switch(event){
+        case ORTE_MIG_PREPARE:
+            command = ORTE_DAEMON_MIG_PREPARE;
+            
+            OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
+                         "%s plm:base:orted_cmd sending ORTE_DAEMON_MIG_PREPARE signal",
                          ORTE_NAME_PRINT(ORTE_PROC_MY_NAME)));
+            
+            OBJ_CONSTRUCT(&cmd, opal_buffer_t);
     
-    OBJ_CONSTRUCT(&cmd, opal_buffer_t);
-    
-    /* pack the command */
-    if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, &command, 1, ORTE_DAEMON_CMD))) {
-        ORTE_ERROR_LOG(rc);
-        OBJ_DESTRUCT(&cmd);
-        return rc;
-    }
-    
-    /* pack the jobid */
-    if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, &job, 1, ORTE_JOBID))) {
-        ORTE_ERROR_LOG(rc);
-        OBJ_DESTRUCT(&cmd);
-        return rc;
-    }
-    
-    /* pack the source node name */
-    if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, src_name, 1, ORTE_NAME))) {
-        ORTE_ERROR_LOG(rc);
-        OBJ_DESTRUCT(&cmd);
-        return rc;
-    }
-    
-    /* pack the destination node name */
-    if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, dest_name , 1, ORTE_NAME))) {
-        ORTE_ERROR_LOG(rc);
-        OBJ_DESTRUCT(&cmd);
-        return rc;
+            /* pack the command */
+            if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, &command, 1, ORTE_DAEMON_CMD))) {
+                ORTE_ERROR_LOG(rc);
+                OBJ_DESTRUCT(&cmd);
+                return rc;
+            }
+            //TODO: extract data from void* param and pack it into cmd
+            break;
+            
+        case ORTE_DAEMON_MIG_EXEC:
+            break;
+            
+        case ORTE_DAEMON_MIG_DONE:
+            break;
+            
+        default:
+            OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
+                         "%s plm:base:orted_cmd Unknown command.",
+                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME)));
     }
     
     /* send it! */

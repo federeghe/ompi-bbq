@@ -114,7 +114,7 @@ orte_plm_base_module_t orte_plm_rsh_module = {
     orte_plm_base_orted_kill_local_procs,
     orte_plm_base_orted_signal_local_procs,
 #if ORTE_ENABLE_MIGRATION
-    orte_plm_base_orted_prepare_migration,
+    orte_plm_mig_event,
 #endif
     rsh_finalize
 };

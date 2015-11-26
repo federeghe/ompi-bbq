@@ -142,7 +142,7 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
     orte_process_name_t name;
     pid_t pid;
     bool running;
-    int8_t flag;
+    int flag;
     int i;
     char **env;
 

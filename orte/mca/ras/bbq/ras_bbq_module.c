@@ -188,7 +188,6 @@ static int recv_data(int fd, short args, void *cbdata)
 
 static int orte_ras_bbq_allocate(orte_job_t *jdata, opal_list_t *nodes)
 {
-    printf("+++++++++ ALLOCATE\n");
     received_job=jdata;
     
     send_cmd_node_request();
@@ -331,7 +330,6 @@ static int send_cmd_node_request(void)
         command.flags |= BBQ_OPT_MIG_AVAILABLE;
     }
     
-    printf("+++++++++ SENDING NODE REQUEST\n");
     command.cmd_type = BBQ_CMD_NODES_REQUEST;
     command.jobid = received_job->jobid;
     
@@ -347,8 +345,6 @@ static int send_cmd_node_request(void)
             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
-    
-    printf("++++++++ COMMAND SENT\n");
 
     job.jobid=received_job->jobid;
     
@@ -372,7 +368,6 @@ static int send_cmd_node_request(void)
         return ORTE_ERROR;
     }
 
-    printf("+++++++ REQUEST SENT\n");
     opal_output_verbose(0, orte_ras_base_framework.framework_output,
         "%s ras:bbq: Requested %u slots for job %u.",
         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),job.slots_requested,job.jobid);

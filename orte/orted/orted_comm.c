@@ -1095,6 +1095,8 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     /* ** MIGRATION ** */
     case ORTE_DAEMON_MIG_PREPARE:
         
+        opal_output(0, "%s orted: command ORTE_DAEMON_MIG_PREPARE received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        
         answer = OBJ_NEW(opal_buffer_t);
         command = ORTE_PLM_MIGRATION_CMD;
         flag = ORTE_MIG_PREPARE_ACK_FLAG;
@@ -1114,6 +1116,8 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
             ORTE_ERROR_LOG(ret);
             OBJ_RELEASE(answer);
         }
+        
+        
         
         //TODO: Switching to migration-aware state 
         
