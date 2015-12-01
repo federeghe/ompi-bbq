@@ -276,6 +276,18 @@ static void rsh_wait_daemon(pid_t pid, int status, void* cbdata)
         return;
     }
 
+    if(migrating_node != NULL && daemon->name.vpid == migrating_node->vpid) {
+        OPAL_OUTPUT_VERBOSE((1, orte_plm_base_framework.framework_output,
+                             "%s daemon %s exit with status %d (checkpointed!)",
+                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                             ORTE_NAME_PRINT(&daemon->name), WEXITSTATUS(status)));
+
+
+        // Ok, it's the migrated node, do not worry.
+        OBJ_RELEASE(caddy);
+        return;
+    }
+
     if (! WIFEXITED(status) || ! WEXITSTATUS(status) == 0) { /* if abnormal exit */
         /* if we are not the HNP, send a message to the HNP alerting it
          * to the failure

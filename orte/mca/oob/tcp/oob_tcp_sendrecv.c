@@ -370,6 +370,15 @@ static int read_bytes(mca_oob_tcp_peer_t* peer)
                                 "%s-%s mca_oob_tcp_msg_recv: peer closed connection", 
                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
                                 ORTE_NAME_PRINT(&(peer->name)));
+#if ORTE_ENABLE_MIGRATION
+            if (mca_oob_tcp_migrating_me) {
+                opal_output_verbose(OOB_TCP_DEBUG_FAIL, orte_oob_base_framework.framework_output,
+                                    "%s-%s mca_oob_tcp_msg_recv: connection closed due to freezed connection.",
+                                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                                    ORTE_NAME_PRINT(&(peer->name)));
+                return ORTE_ERR_RESOURCE_BUSY;
+            }
+#endif
             /* stop all events */
             if (peer->recv_ev_active) {
                 opal_event_del(&peer->recv_event);

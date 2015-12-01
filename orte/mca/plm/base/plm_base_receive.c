@@ -92,7 +92,7 @@ int orte_plm_base_comm_start(void)
                                 orte_plm_base_daemon_failed, NULL);
 #if ORTE_ENABLE_MIGRATION
         orte_rml.recv_buffer_nb(ORTE_NAME_WILDCARD,
-                                ORTE_RML_TAG_MIGRATION_ACK,
+                                ORTE_RML_TAG_MIGRATION,
                                 ORTE_RML_PERSISTENT,
                                 orte_plm_base_recv, NULL);
 #endif
@@ -142,7 +142,7 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
     orte_process_name_t name;
     pid_t pid;
     bool running;
-    int flag;
+    uint8_t flag;
     int i;
     char **env;
 
@@ -155,7 +155,8 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
         ORTE_ERROR_LOG(rc);
         goto CLEANUP;
     }
-        
+
+
     switch (command) {
     case ORTE_PLM_LAUNCH_JOB_CMD:
         OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
@@ -401,19 +402,38 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
         count = 1;
         if (ORTE_SUCCESS != (rc = opal_dss.unpack(buffer, &flag, &count, OPAL_UINT8))) {
             ORTE_ERROR_LOG(rc);
+            break;
         }
         
+        opal_output_verbose(5, orte_plm_base_framework.framework_output,
+                                        "%s plm:base:receive migration flag %i received from %s",
+                                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                                        flag,
+                                        ORTE_NAME_PRINT(sender));
+
         switch(flag){
         /* Messages sent from daemons telling us they're aware of the imminent migration */
         case ORTE_MIG_PREPARE_ACK_FLAG:
+
             if (orte_node_pool->size - orte_node_pool->number_free == ++ack_count){
+                opal_output_verbose(5, orte_plm_base_framework.framework_output,
+                                                "%s plm:base:receive all prepare migration ack received",
+                                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 orte_mig_base.active_module->fwd_info(flag);
+                ack_count = 0;
             }
+
             break;
         
         /* Daemon is ready to migrate */
         case ORTE_MIG_READY_FLAG:
-            //TODO
+            if (orte_node_pool->size - orte_node_pool->number_free == ++ack_count){
+                opal_output_verbose(5, orte_plm_base_framework.framework_output,
+                                                "%s plm:base:receive all exec migration ack received",
+                                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                orte_mig_base.active_module->fwd_info(flag);
+                ack_count = 0;
+            }
             break;
         
         /* Daemon has finished migrating */
@@ -422,6 +442,14 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
             break;
             
         default:
+            opal_output_verbose(10, orte_plm_base_framework.framework_output,
+                                            "%s plm:base:received unknown flag",
+                                            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            ORTE_ERROR_LOG(ORTE_ERR_UNKNOWN_DATA_TYPE);
+            rc = ORTE_ERR_UNKNOWN_DATA_TYPE;
+            break;
+
+
             break;
         }
         break;

@@ -55,6 +55,7 @@ typedef int (*mca_oob_base_component_set_addr_fn_t)(orte_process_name_t *peer,
                                                     char **uris);
 typedef bool (*mca_oob_base_component_is_reachable_fn_t)(orte_process_name_t *peer);
 typedef void (*mca_oob_ping_callback_fn_t)(int status, void *cbdata);
+typedef void (*mca_oob_base_component_mig_event_fn_t)(int event, void *data);
 
 typedef struct {
     mca_base_component_t                      oob_base;
@@ -68,6 +69,7 @@ typedef struct {
     mca_oob_base_component_get_addr_fn_t      get_addr;
     mca_oob_base_component_set_addr_fn_t      set_addr;
     mca_oob_base_component_is_reachable_fn_t  is_reachable;
+    mca_oob_base_component_mig_event_fn_t     mig_event;
 } mca_oob_base_component_t;
 
 /**

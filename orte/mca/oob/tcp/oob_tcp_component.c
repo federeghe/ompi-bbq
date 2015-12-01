@@ -93,6 +93,10 @@ static char* component_get_addr(void);
 static int component_set_addr(orte_process_name_t *peer,
                               char **uris);
 static bool component_is_reachable(orte_process_name_t *peer);
+
+#ifdef ORTE_ENABLE_MIGRATION
+static void mig_event(int event, void* data);
+#endif
 /*
  * Struct of function pointers and all that to let us be initialized
  */
@@ -121,7 +125,10 @@ mca_oob_tcp_component_t mca_oob_tcp_component = {
         component_send,
         component_get_addr,
         component_set_addr,
-        component_is_reachable
+        component_is_reachable,
+#ifdef ORTE_ENABLE_MIGRATION
+        mig_event
+#endif
     },
 };
 
@@ -727,6 +734,17 @@ static char* component_get_addr(void)
     /* return our uri */
     return cptr;
 }
+
+#ifdef ORTE_ENABLE_MIGRATION
+static void mig_event(int event, void* data)
+{
+    opal_output_verbose(5, orte_oob_base_framework.framework_output,
+                        "%s oob:tcp:mig_event %d",
+                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                        event);
+    mca_oob_tcp_module.api.mig_event(event,data);
+}
+#endif
 
 static int component_set_addr(orte_process_name_t *peer,
                               char **uris)

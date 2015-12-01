@@ -25,6 +25,18 @@
 
 #include "orte/mca/oob/base/base.h"
 
+#ifdef ORTE_ENABLE_MIGRATION
+void orte_oob_base_mig_event(int event, void* data)
+{
+    mca_base_component_list_item_t *cli;
+    mca_oob_base_component_t *component;
+
+    OPAL_LIST_FOREACH(cli, &orte_oob_base.actives, mca_base_component_list_item_t) {
+        component = (mca_oob_base_component_t*)cli->cli_component;
+        component->mig_event(event, data);
+    }
+}
+#endif
 
 void orte_oob_base_send_nb(int fd, short args, void *cbdata)
 {

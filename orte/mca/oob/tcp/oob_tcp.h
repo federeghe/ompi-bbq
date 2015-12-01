@@ -114,6 +114,9 @@ typedef enum {
 ORTE_MODULE_DECLSPEC void mca_oob_tcp_send_handler(int fd, short args, void *cbdata);
 ORTE_MODULE_DECLSPEC void mca_oob_tcp_recv_handler(int fd, short args, void *cbdata);
 
+#ifdef ORTE_ENABLE_MIGRATION
+extern bool mca_oob_tcp_migrating_me;
+#endif
 
 END_C_DECLS
 

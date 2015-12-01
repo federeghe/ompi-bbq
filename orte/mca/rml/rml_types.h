@@ -149,7 +149,7 @@ BEGIN_C_DECLS
 #define ORTE_RML_TAG_CONFIRM_SPAWN          53
 
 #if ORTE_ENABLE_MIGRATION
-#define ORTE_RML_TAG_MIGRATION_ACK          54
+#define ORTE_RML_TAG_MIGRATION              54
 #endif
 
 #define ORTE_RML_TAG_MAX                   100

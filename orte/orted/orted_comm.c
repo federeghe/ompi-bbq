@@ -79,10 +79,24 @@
 
 #include "orte/orted/orted.h"
 
+#ifdef ORTE_ENABLE_MIGRATION
+#include "orte/mca/mig/mig_types.h"
+#include "orte/mca/oob/base/base.h"
+
+static void orted_mig_callback(int status, orte_process_name_t *peer,
+                            opal_buffer_t* buffer, orte_rml_tag_t tag,
+                            void* cbdata);
+
+orte_process_name_t mig_src;
+int mig_status;
+
+#endif
+
 /*
  * Globals
  */
 static char *get_orted_comm_cmd_str(int command);
+
 
 static opal_pointer_array_t *procs_prev_ordered_to_terminate = NULL;
 
@@ -113,12 +127,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     orte_proc_t *cur_proc = NULL, *prev_proc = NULL;
     bool found = false;
     uint8_t flag;
-    char hostname[256];
-    FILE *fd;
 
-#ifdef ORTE_ENABLE_MIGRATION
-	orte_node_t *node;
-#endif
     /* unpack the command */
     n = 1;
     if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &command, &n, ORTE_DAEMON_CMD))) {
@@ -1092,44 +1101,61 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
 #ifdef ORTE_ENABLE_MIGRATION
 
+#define SEND_MIG_ACK(ack_type)  do {          \
+        answer = OBJ_NEW(opal_buffer_t);  \
+        command = ORTE_PLM_MIGRATION_CMD; \
+        flag = ack_type; \
+                                          \
+        if (ORTE_SUCCESS != (ret = opal_dss.pack(answer, &command, 1, ORTE_PLM_CMD))) { \
+            ORTE_ERROR_LOG(ret);    \
+            OBJ_RELEASE(answer);    \
+        }   \
+        \
+        if(ORTE_SUCCESS != (ret = opal_dss.pack(answer, &flag, 1, OPAL_UINT8))){ \
+            ORTE_ERROR_LOG(ret); \
+            OBJ_RELEASE(answer); \
+        } \
+        \
+        if (0 > (ret = orte_rml.send_buffer_nb(ORTE_PROC_MY_HNP, answer, ORTE_RML_TAG_MIGRATION, \
+                                                                    orted_mig_callback, NULL))) { \
+            ORTE_ERROR_LOG(ret);    \
+            OBJ_RELEASE(answer);    \
+        }\
+        }while (0)
+
     /* ** MIGRATION ** */
     case ORTE_DAEMON_MIG_PREPARE:
-        
         opal_output(0, "%s orted: command ORTE_DAEMON_MIG_PREPARE received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         
-        answer = OBJ_NEW(opal_buffer_t);
-        command = ORTE_PLM_MIGRATION_CMD;
-        flag = ORTE_MIG_PREPARE_ACK_FLAG;
-        
-        if (ORTE_SUCCESS != (ret = opal_dss.pack(answer, &command, 1, ORTE_PLM_CMD))) {
-            ORTE_ERROR_LOG(ret);
-            OBJ_RELEASE(relay_msg);
-        }
-        
-        if(ORTE_SUCCESS != (ret = opal_dss.pack(answer, &flag, 1, OPAL_UINT8))){
-            ORTE_ERROR_LOG(ret);
-            OBJ_RELEASE(relay_msg);
-        }
-        
-        if (0 > (ret = orte_rml.send_buffer_nb(ORTE_PROC_MY_HNP, answer, ORTE_RML_TAG_MIGRATION_ACK,
-                                                   orte_rml_send_callback, NULL))) {
-            ORTE_ERROR_LOG(ret);
-            OBJ_RELEASE(answer);
-        }
-        
-        
-        
-        //TODO: Switching to migration-aware state 
-        
-        /*
-        n=1;
-        if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &node, &n, ORTE_NODE))) {
+        /* unpack the process name of the migrating node */
+        n = 1;
+        if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &mig_src, &n, ORTE_NAME))) {
             ORTE_ERROR_LOG(ret);
             goto CLEANUP;
         }
-        */
+
+        if (ORTE_PROC_MY_NAME->jobid == mig_src.jobid && ORTE_PROC_MY_NAME->vpid == mig_src.vpid ) {
+            opal_output(0, "%s orted: I am the migrating node!", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            orte_oob_base_mig_event(ORTE_MIG_PREPARE, &mig_src);
+        }
+
+        mig_status = ORTE_DAEMON_MIG_PREPARE;   // Abuse of constant
+        // TODO: btl
+
+        
+        // Send the ack back
+        SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
+        
         break;
     case ORTE_DAEMON_MIG_EXEC:
+        opal_output(0, "%s orted: command ORTE_DAEMON_MIG_EXEC received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
+        mig_status = ORTE_DAEMON_MIG_EXEC;   // Abuse of constant
+
+
+        SEND_MIG_ACK(ORTE_MIG_READY_FLAG);
+
+
         break;
     case ORTE_DAEMON_MIG_DONE:
         break;
@@ -1202,8 +1228,34 @@ static char *get_orted_comm_cmd_str(int command)
         
     case ORTE_DAEMON_MIG_PREPARE:
         return strdup("ORTE_DAEMON_MIG_PREPARE");
+    case ORTE_DAEMON_MIG_EXEC:
+        return strdup("ORTE_DAEMON_MIG_EXEC");
+    case ORTE_DAEMON_MIG_DONE:
+        return strdup("ORTE_DAEMON_MIG_DONE");
+
+
         
     default:
         return strdup("Unknown Command!");
     }
 }
+
+#if ORTE_ENABLE_MIGRATION
+
+static void orted_mig_callback(int status, orte_process_name_t *peer,
+                            opal_buffer_t* buffer, orte_rml_tag_t tag,
+                            void* cbdata)
+{   // Called after successful send
+
+    if (mig_status == ORTE_DAEMON_MIG_EXEC) {
+        if (ORTE_PROC_MY_NAME->jobid == mig_src.jobid && ORTE_PROC_MY_NAME->vpid == mig_src.vpid ) {
+            opal_output(0, "%s orted: I am the migrating node! Exec migration!", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            orte_oob_base_mig_event(ORTE_MIG_EXEC, &mig_src);
+        }
+    }
+    orte_rml_send_callback(status,peer,buffer, tag,cbdata);
+
+}
+
+#endif
+

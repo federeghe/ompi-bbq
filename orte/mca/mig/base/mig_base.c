@@ -38,11 +38,15 @@
 #include "orte/mca/ras/bbq/bbq_ompi_types.h"
 #include "orte/mca/ras/ras.h"
 #include "orte/mca/ras/base/base.h"
+#include "orte/mca/ras/ras.h"
+
+#include "orte/mca/oob/tcp/oob_tcp.h"
 
 char mig_src[256];
 char mig_dest[256];
 orte_job_t *mig_job;
 orte_process_name_t mig_orted;
+
 
 int orte_mig_base_prepare_migration(orte_job_t *jdata,
                                 char *src_name,
@@ -64,21 +68,34 @@ int orte_mig_base_prepare_migration(orte_job_t *jdata,
     
     if (OPAL_UNLIKELY(node == NULL)) {
             opal_output_verbose(10, orte_mig_base_framework.framework_output,
-                            "%s mig:criu: Error: source node not found.",
+                            "%s mig:base: Error: source node not found.",
                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             return ORTE_ERROR;
     }
+
+    opal_output_verbose(0, orte_mig_base_framework.framework_output,
+                    "%s mig:base: Preparing for migration, sending mig_event...",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
     
     mig_orted = node->daemon->name;
-    orte_plm.mig_event(ORTE_MIG_PREPARE, NULL);
+    orte_plm.mig_event(ORTE_MIG_PREPARE, &mig_orted);
+    orte_oob_base_mig_event(ORTE_MIG_PREPARE, &mig_orted);
     
+    return ORTE_SUCCESS;
+
 }
 
 int orte_mig_base_fwd_info(int flag){
     switch(flag){
         case ORTE_MIG_PREPARE_ACK_FLAG:
             orte_ras_base.active_module->send_mig_info(BBQ_CMD_MIGRATION_READY);
+            orte_plm.mig_event(ORTE_MIG_EXEC, &mig_orted);
+
             break;
+        case ORTE_MIG_READY_FLAG:
+            orte_oob_base_mig_event(ORTE_MIG_EXEC, &mig_orted);
+        break;
         default:
             opal_output_verbose(0, orte_mig_base_framework.framework_output,
                 "%s mig:criu: Unknown message to forward.",
