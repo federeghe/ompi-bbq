@@ -37,6 +37,9 @@
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
@@ -87,8 +90,11 @@ static void orted_mig_callback(int status, orte_process_name_t *peer,
                             opal_buffer_t* buffer, orte_rml_tag_t tag,
                             void* cbdata);
 
-orte_process_name_t mig_src;
-int mig_status;
+static orte_process_name_t mig_src;
+static int mig_status;
+static char mig_fifo_name[30];
+
+
 
 #endif
 
@@ -1127,6 +1133,13 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     case ORTE_DAEMON_MIG_PREPARE:
         opal_output(0, "%s orted: command ORTE_DAEMON_MIG_PREPARE received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         
+
+
+        /* Create the Named pipe to sync with the HNP during a migration */
+        int my_pid = getpid();
+        snprintf(mig_fifo_name,30, "/tmp/pipe_ortedmig%d", my_pid);
+        mkfifo(mig_fifo_name,0666);
+
         /* unpack the process name of the migrating node */
         n = 1;
         if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &mig_src, &n, ORTE_NAME))) {
@@ -1152,9 +1165,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         mig_status = ORTE_DAEMON_MIG_EXEC;   // Abuse of constant
 
-
         SEND_MIG_ACK(ORTE_MIG_READY_FLAG);
-
 
         break;
     case ORTE_DAEMON_MIG_DONE:
@@ -1251,8 +1262,16 @@ static void orted_mig_callback(int status, orte_process_name_t *peer,
         if (ORTE_PROC_MY_NAME->jobid == mig_src.jobid && ORTE_PROC_MY_NAME->vpid == mig_src.vpid ) {
             opal_output(0, "%s orted: I am the migrating node! Exec migration!", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             orte_oob_base_mig_event(ORTE_MIG_EXEC, &mig_src);
+            opal_output(0, "%s orted: FIFO WRITING!", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
+            int mig_fifo;
+            mig_fifo = open(mig_fifo_name, O_WRONLY);
+            close(mig_fifo);
+            remove(mig_fifo_name);
         }
     }
+
+
     orte_rml_send_callback(status,peer,buffer, tag,cbdata);
 
 }

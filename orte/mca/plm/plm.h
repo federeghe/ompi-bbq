@@ -102,6 +102,9 @@ typedef int (*orte_plm_base_module_signal_job_fn_t)(orte_jobid_t, int32_t);
  * Migration event
  */
 typedef int (*orte_plm_base_module_mig_event_fn_t)(int event, void *data);
+typedef int (*orte_plm_base_module_mig_checkpoint_fn_t)(const orte_process_name_t* proc);
+typedef int (*orte_plm_base_module_mig_restore_fn_t)(const char* new_hostname);
+
 #endif
 
 /**
@@ -116,9 +119,13 @@ struct orte_plm_base_module_1_0_0_t {
     orte_plm_base_module_terminate_orteds_fn_t   terminate_orteds;
     orte_plm_base_module_terminate_procs_fn_t    terminate_procs;
     orte_plm_base_module_signal_job_fn_t         signal_job;
+
 #if ORTE_ENABLE_MIGRATION
     orte_plm_base_module_mig_event_fn_t          mig_event;
+    orte_plm_base_module_mig_checkpoint_fn_t     mig_checkpoint;
+    orte_plm_base_module_mig_restore_fn_t        mig_restore;
 #endif
+
     orte_plm_base_module_finalize_fn_t           finalize;
 };
 

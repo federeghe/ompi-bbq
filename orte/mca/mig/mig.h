@@ -39,7 +39,7 @@ typedef int (*orte_mig_base_module_migrate_fn_t)(void);
 /**
  * Forwards migration info to the framework communicating with resources manager
  */
-typedef int (*orte_mig_base_module_fwd_info_fn_t)(uint8_t flag);
+typedef int (*orte_mig_base_module_fwd_info_fn_t)(int flag);
 
 
 /**

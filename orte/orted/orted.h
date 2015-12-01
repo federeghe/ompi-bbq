@@ -46,6 +46,8 @@ ORTE_DECLSPEC int orte_daemon_process_commands(orte_process_name_t* sender,
                                                opal_buffer_t *buffer,
                                                orte_rml_tag_t tag);
 
+
+
 END_C_DECLS
 
 /* Local function */
