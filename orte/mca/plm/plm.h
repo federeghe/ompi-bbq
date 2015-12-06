@@ -103,7 +103,7 @@ typedef int (*orte_plm_base_module_signal_job_fn_t)(orte_jobid_t, int32_t);
  */
 typedef int (*orte_plm_base_module_mig_event_fn_t)(int event, void *data);
 typedef int (*orte_plm_base_module_mig_checkpoint_fn_t)(const orte_process_name_t* proc);
-typedef int (*orte_plm_base_module_mig_restore_fn_t)(const char* new_hostname);
+typedef int (*orte_plm_base_module_mig_restore_fn_t)(const char* new_hostname, const orte_process_name_t* proc);
 
 #endif
 

@@ -106,7 +106,7 @@ static int rsh_finalize(void);
 
 #if ORTE_ENABLE_MIGRATION
 static int rsh_checkpoint(const orte_process_name_t* proc);
-static int rsh_restore(const char *new_hostname);
+static int rsh_restore(const char *new_hostname, const orte_process_name_t* proc);
 #endif
 
 orte_plm_base_module_t orte_plm_rsh_module = {
@@ -1667,20 +1667,23 @@ static int setup_shell(orte_plm_rsh_shell_t *rshell,
 #if ORTE_ENABLE_MIGRATION
 
 static int rsh_checkpoint(const orte_process_name_t* proc) {
+
+    return ORTE_SUCCESS;
+}
+static int rsh_restore(const char *new_hostname, const orte_process_name_t* proc) {
+
     orte_plm_rsh_caddy_t *caddy;
 
-    const char *argv[] = {
-            "criu",
-            "checkpoint",
-            "-D",
-            "/tmp/checkpoint",   // TODO: Dynamic
-            "-t",
-            "`pidof orted`"      // TODO: PID
-    };
+    char **argv = malloc(sizeof(const char*)*4);
+
+    argv[0] = strdup("-t");
+    argv[1] = strdup(new_hostname);
+    argv[2] = strdup("orted-restore");
+    argv[3] = NULL;
 
     caddy = OBJ_NEW(orte_plm_rsh_caddy_t);
-    caddy->argc = sizeof(argv) / sizeof(const char*);
-    caddy->argv = opal_argv_copy((char**)argv);
+    caddy->argc = 3;
+    caddy->argv = opal_argv_copy(argv);
 
     caddy->daemon = OBJ_NEW(orte_proc_t);
     caddy->daemon->name.jobid = proc->jobid;
@@ -1689,9 +1692,8 @@ static int rsh_checkpoint(const orte_process_name_t* proc) {
 
     opal_event_active(&launch_event, EV_WRITE, 1);  // Launch!
 
-    return ORTE_SUCCESS;
-}
-static int rsh_restore(const char *new_hostname) {
+    opal_argv_free(argv);
+
     return ORTE_SUCCESS;
 }
 
