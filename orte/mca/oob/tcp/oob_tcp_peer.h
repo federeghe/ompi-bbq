@@ -100,4 +100,11 @@ OBJ_CLASS_DECLARATION(mca_oob_tcp_peer_op_t);
         opal_event_active(&pop->ev, OPAL_EV_WRITE, 1);                  \
     } while(0);
 
+#ifdef ORTE_ENABLE_MIGRATION
+// Defined in oob_tcp.c
+extern bool mca_oob_tcp_migrating_me;
+extern mca_oob_tcp_peer_t* mca_oob_tcp_migrating_peer;
+#endif
+
+
 #endif /* _MCA_OOB_TCP_PEER_H_ */
