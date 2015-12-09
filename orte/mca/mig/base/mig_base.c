@@ -89,7 +89,7 @@ int orte_mig_base_prepare_migration(orte_job_t *jdata,
 int orte_mig_base_fwd_info(int flag){
     switch(flag){
         case ORTE_MIG_PREPARE_ACK_FLAG:
-            orte_ras_base.active_module->send_mig_info(BBQ_CMD_MIGRATION_READY);
+            orte_ras_base.active_module->send_mig_info(ORTE_MIG_READY);
             orte_plm.mig_event(ORTE_MIG_EXEC, &mig_orted);
 
             break;

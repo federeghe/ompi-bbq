@@ -13,15 +13,19 @@
 
 #include "orte_config.h"
 
-// Costants for event
+// Constants for event
 #define ORTE_MIG_PREPARE 0
 #define ORTE_MIG_EXEC 1
 #define ORTE_MIG_DONE 2
+
+// Constants for information forwarding
+#define ORTE_MIG_READY 0
 
 
 BEGIN_C_DECLS
 
 typedef enum{
+    MIG_NULL,
     MIG_AVAILABLE,
     MIG_MOVING,
     MIG_FINISHED,

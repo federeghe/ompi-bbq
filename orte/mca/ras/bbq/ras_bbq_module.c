@@ -54,7 +54,7 @@ static int recv_cmd(void);
 static int send_cmd_node_request(void);
 static int send_cmd_terminate(void);
 
-/* MIG-related function */
+/* MIG-related functions */
 static int migrate(void);
 static int send_mig_info(uint8_t state);
 
@@ -434,9 +434,20 @@ static int migrate(void){
 
 static int send_mig_info(uint8_t state){
     local_bbq_cmd_t command;
-    
-    command.cmd_type = state;
+
     command.jobid = received_job->jobid;
+    
+    switch(state){
+        case ORTE_MIG_READY:
+            command.cmd_type = BBQ_CMD_MIGRATION_READY;
+            break;
+        default:
+            opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq: send_mig_info received unknown flag.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            return ORTE_ERROR;
+    }
+
     
     opal_output_verbose(0, orte_ras_base_framework.framework_output,
             "%s ras:bbq: Sending migration state to BBQ.",

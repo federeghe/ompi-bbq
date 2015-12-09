@@ -32,6 +32,19 @@
 
 BEGIN_C_DECLS
 
+#if ORTE_ENABLE_MIGRATION
+
+#include "criu/criu.h"
+
+ORTE_DECLSPEC void orted_mig_callback(int status, orte_process_name_t *peer,
+                            opal_buffer_t* buffer, orte_rml_tag_t tag,
+                            void* cbdata);
+
+extern orte_process_name_t mig_src_p;
+extern int mig_status;
+
+#endif
+
 /* main orted routine */
 ORTE_DECLSPEC int orte_daemon(int argc, char *argv[]);
 
