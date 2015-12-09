@@ -727,6 +727,7 @@ static void ft_event(int state) {
 
 #if ORTE_ENABLE_MIGRATION
 bool mca_oob_tcp_migrating_me = false;
+mca_oob_tcp_peer_t* mca_oob_tcp_migrating_peer=NULL;
 #define AM_I_NODE(p) (((orte_process_name_t*)p)->jobid == ORTE_PROC_MY_NAME->jobid \
 					  && ((orte_process_name_t*)p)->vpid == ORTE_PROC_MY_NAME->vpid)
 
@@ -737,7 +738,6 @@ bool mca_oob_tcp_migrating_me = false;
  * @param    data    a generic data. The type depends on state parameter
  */
 static void mig_event(int event, void* data) {
-    static mca_oob_tcp_peer_t *peer = NULL;
     static orte_process_name_t peer_name;
 
     switch(event) {
@@ -748,8 +748,8 @@ static void mig_event(int event, void* data) {
         if (OPAL_LIKELY(data != NULL) ) {
 
             if (!AM_I_NODE(data)) {
-                peer = mca_oob_tcp_peer_lookup((orte_process_name_t*)data);
-                if (OPAL_UNLIKELY(peer == NULL)) {
+                mca_oob_tcp_migrating_peer = mca_oob_tcp_peer_lookup((orte_process_name_t*)data);
+                if (OPAL_UNLIKELY(mca_oob_tcp_migrating_peer == NULL)) {
                     // Error, no source peer found
                     opal_output (0, "%s:oob_tcp_mig_event: Could not find process %s for migration.\n",
                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
@@ -796,9 +796,9 @@ static void mig_event(int event, void* data) {
     		                            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
     		// Freeze all pending send
-            peer->state = MCA_OOB_TCP_FREEZED;
+    		mca_oob_tcp_migrating_peer->state = MCA_OOB_TCP_FREEZED;
 
-            mca_oob_tcp_peer_close(peer);
+            mca_oob_tcp_peer_close(mca_oob_tcp_migrating_peer);
 
             /*
              * It's not necessary to delete the peer from the hash table.
@@ -816,7 +816,7 @@ static void mig_event(int event, void* data) {
     	if (AM_I_NODE(&peer_name)) {
             mig_me(true);
     	} else {
-            mig_done(peer, (const char*)data);
+            mig_done(mca_oob_tcp_migrating_peer, (const char*)data);
     	}
     break;
 

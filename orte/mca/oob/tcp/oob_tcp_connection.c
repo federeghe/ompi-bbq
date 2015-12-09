@@ -857,6 +857,20 @@ void mca_oob_tcp_peer_close(mca_oob_tcp_peer_t *peer)
 
 #ifdef ORTE_ENABLE_MIGRATION
     if (MCA_OOB_TCP_FREEZED == peer->state) {
+        if (NULL != peer->active_addr) {
+            peer->active_addr->state = MCA_OOB_TCP_FREEZED;
+        }
+
+        /* unregister active events */
+        if (peer->recv_ev_active) {
+            opal_event_del(&peer->recv_event);
+            peer->recv_ev_active = false;
+        }
+        if (peer->send_ev_active) {
+            opal_event_del(&peer->send_event);
+            peer->send_ev_active = false;
+        }
+
         // Do nothing else, we must not inform the
         // component-level
         return;

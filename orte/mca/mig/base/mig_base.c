@@ -94,7 +94,9 @@ int orte_mig_base_fwd_info(int flag){
 
             break;
         case ORTE_MIG_READY_FLAG:
+            orte_ras_base.active_module->send_mig_info(BBQ_CMD_MIGRATION_ONGOING);
             orte_oob_base_mig_event(ORTE_MIG_EXEC, &mig_orted);
+            orte_plm.mig_restore(mig_dest, &mig_orted);
         break;
         default:
             opal_output_verbose(0, orte_mig_base_framework.framework_output,
