@@ -41,6 +41,11 @@ typedef int (*orte_mig_base_module_migrate_fn_t)(void);
  */
 typedef int (*orte_mig_base_module_fwd_info_fn_t)(int flag);
 
+/**
+ * Restore on remote node.
+ */
+typedef int (*orte_mig_base_module_restore_fn_t)(void);
+
 
 /**
  *  Finalize the module
@@ -59,6 +64,8 @@ struct orte_mig_base_module_2_0_0_t {
     orte_mig_base_module_migrate_fn_t      migrate;
     /** Forward info function pointer */
     orte_mig_base_module_fwd_info_fn_t      fwd_info;
+    /** Restore the node on the destination side */
+    orte_mig_base_module_restore_fn_t      restore;
     /** Finalize function pointer */
     orte_mig_base_module_finalize_fn_t      finalize;
     /** State of the active module, may be needed*/

@@ -51,6 +51,7 @@
 static int init(void);
 static int orte_mig_criu_migrate(void);
 static int orte_mig_criu_finalize(void);
+static int orte_mig_criu_restore(void);
 
 /*
  * Global variables
@@ -66,7 +67,8 @@ orte_mig_base_module_t orte_mig_criu_module = {
     orte_mig_base_prepare_migration,
     orte_mig_criu_migrate,
     orte_mig_base_fwd_info,
-    orte_mig_criu_finalize,
+    orte_mig_criu_restore,
+    orte_mig_criu_finalize
 };
 
 static int init(void){

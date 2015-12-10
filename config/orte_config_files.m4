@@ -27,6 +27,7 @@ AC_DEFUN([ORTE_CONFIG_FILES],[
         orte/tools/wrappers/orte.pc
         orte/tools/orte-checkpoint/Makefile
         orte/tools/orte-restart/Makefile
+        orte/tools/orted-restore/Makefile
         orte/tools/orte-ps/Makefile
         orte/tools/orte-clean/Makefile
         orte/tools/orte-top/Makefile
