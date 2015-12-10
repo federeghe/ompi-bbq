@@ -105,6 +105,7 @@ static int rsh_terminate_orteds(void);
 static int rsh_finalize(void);
 
 #if ORTE_ENABLE_MIGRATION
+#include "orte/mca/mig/base/base.h"
 static int rsh_checkpoint(const orte_process_name_t* proc);
 static int rsh_restore(const char *new_hostname, const orte_process_name_t* proc);
 #endif
@@ -645,6 +646,13 @@ static int setup_launch(int *argcptr, char ***argvptr,
     opal_argv_append_nosize(&argv, "plm");
     opal_argv_append_nosize(&argv, "rsh");
     
+#if ORTE_ENABLE_MIGRATION
+    /*
+    opal_argv_append_nosize(&argv, "-mca");
+    opal_argv_append_nosize(&argv, "mig");
+    opal_argv_append_nosize(&argv, orte_mig_base.active_module->name);
+     */
+#endif
     /* unless told otherwise... */
     if (mca_plm_rsh_component.pass_environ_mca_params) {
         /* now check our local environment for MCA params - add them

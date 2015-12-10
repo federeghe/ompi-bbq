@@ -15,6 +15,7 @@
  * Copyright (c) 2009      Sun Microsystems, Inc. All rights reserved.
  * Copyright (c) 2010-2011 Oak Ridge National Labs.  All rights reserved.
  * Copyright (c) 2014      Intel, Inc. All rights reserved.
+ * Copyright (c) 2015-2016 Politecnico di Milano. All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -84,17 +85,16 @@
 
 #ifdef ORTE_ENABLE_MIGRATION
 #include "orte/mca/mig/mig_types.h"
+#include "orte/mca/mig/base/base.h"
+
 #include "orte/mca/oob/base/base.h"
 
-static void orted_mig_callback(int status, orte_process_name_t *peer,
+orte_process_name_t mig_src_p;
+int mig_status;
+
+void orted_mig_callback(int status, orte_process_name_t *peer,
                             opal_buffer_t* buffer, orte_rml_tag_t tag,
                             void* cbdata);
-
-static orte_process_name_t mig_src;
-static int mig_status;
-static char mig_fifo_name[30];
-
-
 
 #endif
 
@@ -114,7 +114,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     opal_buffer_t *relay_msg;
     int ret;
     orte_std_cntr_t n;
-    int32_t signal;
+    int32_t _signal;
     orte_jobid_t job;
     orte_rml_tag_t target_tag;
     char *contact_info;
@@ -209,39 +209,39 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
             ORTE_ERROR_LOG(ret);
             goto CLEANUP;
         }
-                
+        
         /* look up job data object */
         jdata = orte_get_job_data_object(job);
 
         /* get the signal */
         n = 1;
-        if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &signal, &n, OPAL_INT32))) {
+        if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &_signal, &n, OPAL_INT32))) {
             ORTE_ERROR_LOG(ret);
             goto CLEANUP;
         }
 
         /* Convert SIGTSTP to SIGSTOP so we can suspend a.out */
-        if (SIGTSTP == signal) {
+        if (SIGTSTP == _signal) {
             if (orte_debug_daemons_flag) {
                 opal_output(0, "%s orted_cmd: converted SIGTSTP to SIGSTOP before delivering",
                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             }
-            signal = SIGSTOP;
+            _signal = SIGSTOP;
             if (NULL != jdata) {
                 jdata->state |= ORTE_JOB_STATE_SUSPENDED;
             }
-        } else if (SIGCONT == signal && NULL != jdata) {
+        } else if (SIGCONT == _signal && NULL != jdata) {
             jdata->state &= ~ORTE_JOB_STATE_SUSPENDED;
         }
 
         if (orte_debug_daemons_flag) {
             opal_output(0, "%s orted_cmd: received signal_local_procs, delivering signal %d",
                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
-                        signal);
+                        _signal);
         }
 
         /* signal them */
-        if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, signal))) {
+        if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, _signal))) {
             ORTE_ERROR_LOG(ret);
         }
         break;
@@ -1137,19 +1137,17 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         /* Create the Named pipe to sync with the HNP during a migration */
         int my_pid = getpid();
-        snprintf(mig_fifo_name,30, "/tmp/pipe_ortedmig%d", my_pid);
-        mkfifo(mig_fifo_name,0666);
 
         /* unpack the process name of the migrating node */
         n = 1;
-        if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &mig_src, &n, ORTE_NAME))) {
+        if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &mig_src_p, &n, ORTE_NAME))) {
             ORTE_ERROR_LOG(ret);
             goto CLEANUP;
         }
 
-        if (ORTE_PROC_MY_NAME->jobid == mig_src.jobid && ORTE_PROC_MY_NAME->vpid == mig_src.vpid ) {
+        if (ORTE_PROC_MY_NAME->jobid == mig_src_p.jobid && ORTE_PROC_MY_NAME->vpid == mig_src_p.vpid ) {
             opal_output(0, "%s orted: I am the migrating node!", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-            orte_oob_base_mig_event(ORTE_MIG_PREPARE, &mig_src);
+            orte_oob_base_mig_event(ORTE_MIG_PREPARE, &mig_src_p);
         }
 
         mig_status = ORTE_DAEMON_MIG_PREPARE;   // Abuse of constant
@@ -1182,6 +1180,46 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
  CLEANUP:
     return;
 }
+
+#if ORTE_ENABLE_MIGRATION
+
+void orted_mig_callback(int status, orte_process_name_t *peer,
+                            opal_buffer_t* buffer, orte_rml_tag_t tag,
+                            void* cbdata){
+    pid_t pid, fpid;
+    
+    char hostname[100];
+    gethostname(hostname, 100);
+    fprintf(stderr, "++++++++++++ orte_mig_callback on %s\n", hostname);
+    
+    fpid = getpid();
+    
+    orte_rml_send_callback(status,peer,buffer, tag,cbdata);
+    
+    signal(SIGUSR1, NULL);
+    
+    if (mig_status == ORTE_DAEMON_MIG_EXEC) {
+        if (ORTE_PROC_MY_NAME->jobid == mig_src_p.jobid && ORTE_PROC_MY_NAME->vpid == mig_src_p.vpid ) {
+            opal_output(0, "%s orted: I am the migrating node! Exec migration!", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            orte_oob_base_mig_event(ORTE_MIG_EXEC, &mig_src_p);
+            
+            pid = fork();
+            
+            if(pid == 0){
+                if (0 > setsid()){
+                    opal_output(0, "%s orted: Error detaching child", 
+                            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                    //TODO: notify somehow the failure
+                }else{   
+                    opal_output(0, "%s orted: Child detached, dumping father...", 
+                            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                    orte_mig_base.active_module->migrate(fpid);
+                }
+            }
+        }
+    }
+}
+#endif
 
 static char *get_orted_comm_cmd_str(int command)
 {
@@ -1250,31 +1288,4 @@ static char *get_orted_comm_cmd_str(int command)
         return strdup("Unknown Command!");
     }
 }
-
-#if ORTE_ENABLE_MIGRATION
-
-static void orted_mig_callback(int status, orte_process_name_t *peer,
-                            opal_buffer_t* buffer, orte_rml_tag_t tag,
-                            void* cbdata)
-{   // Called after successful send
-
-    if (mig_status == ORTE_DAEMON_MIG_EXEC) {
-        if (ORTE_PROC_MY_NAME->jobid == mig_src.jobid && ORTE_PROC_MY_NAME->vpid == mig_src.vpid ) {
-            opal_output(0, "%s orted: I am the migrating node! Exec migration!", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-            orte_oob_base_mig_event(ORTE_MIG_EXEC, &mig_src);
-            opal_output(0, "%s orted: FIFO WRITING!", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
-            int mig_fifo;
-            mig_fifo = open(mig_fifo_name, O_WRONLY);
-            close(mig_fifo);
-            remove(mig_fifo_name);
-        }
-    }
-
-
-    orte_rml_send_callback(status,peer,buffer, tag,cbdata);
-
-}
-
-#endif
 

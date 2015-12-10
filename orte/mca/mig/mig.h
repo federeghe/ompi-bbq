@@ -34,7 +34,7 @@ typedef int (*orte_mig_base_module_prepare_migration_fn_t)(orte_job_t *jdata,
 /**
  * Start process migration.
  */
-typedef int (*orte_mig_base_module_migrate_fn_t)(void);
+typedef int (*orte_mig_base_module_migrate_fn_t)(pid_t fpid);
 
 /**
  * Forwards migration info to the framework communicating with resources manager
@@ -70,6 +70,8 @@ struct orte_mig_base_module_2_0_0_t {
     orte_mig_base_module_finalize_fn_t      finalize;
     /** State of the active module, may be needed*/
     orte_mig_migration_state_t state;
+    /** Name of the active module, to be passed to daemons*/
+    char *name;
 };
 /** Convenience typedef */
 typedef struct orte_mig_base_module_2_0_0_t orte_mig_base_module_2_0_0_t;

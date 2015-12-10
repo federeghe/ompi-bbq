@@ -23,6 +23,9 @@
 #include "orte/types.h"
 
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
@@ -48,8 +51,11 @@
 #include "orte/mca/ras/ras.h"
 #include "orte/mca/ras/base/base.h"
 
+#include "criu/criu.h"
+
+
 static int init(void);
-static int orte_mig_criu_migrate(void);
+static int orte_mig_criu_migrate(pid_t fpid);
 static int orte_mig_criu_finalize(void);
 static int orte_mig_criu_restore(void);
 
@@ -57,10 +63,9 @@ static int orte_mig_criu_restore(void);
  * Global variables
  */
 
-char mig_src[256];
-char mig_dest[256];
 orte_job_t *mig_job;
 orte_process_name_t mig_orted;
+char name[]="criu";
 
 orte_mig_base_module_t orte_mig_criu_module = {
     init,
@@ -68,7 +73,9 @@ orte_mig_base_module_t orte_mig_criu_module = {
     orte_mig_criu_migrate,
     orte_mig_base_fwd_info,
     orte_mig_criu_restore,
-    orte_mig_criu_finalize
+    orte_mig_criu_finalize,
+    MIG_NULL,
+    name
 };
 
 static int init(void){
@@ -77,14 +84,41 @@ static int init(void){
     opal_output_verbose(0, orte_mig_base_framework.framework_output,
                 "%s mig:criu: Criu module initialized.",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    char hostname[100];
+    gethostname(hostname, 100);
+    fprintf(stderr, "++++++++++++ I'm MIG on %s\n", hostname);
     return ORTE_SUCCESS;
 }
 
-static int orte_mig_criu_migrate(){
+static int orte_mig_criu_migrate(pid_t fpid){
+    int dir;
+    
+    char hostname[100];
+    gethostname(hostname, 100);
+    fprintf(stderr, "++++++++++++ I'm CRIU on %s\n", hostname);
+    criu_init_opts();
+    criu_set_pid(fpid);
+
+    dir = open("/tmp/dump", O_DIRECTORY);
+    criu_set_images_dir_fd(dir);
+
+    if(0 > criu_dump()){
+        opal_output(0, "%s orted: Error dumping father process", 
+            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+
+    opal_output(0, "%s orted: Daemon successfully dumped", 
+            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     return ORTE_SUCCESS;
 }
 
 
 static int orte_mig_criu_finalize(void){
     return ORTE_SUCCESS;
+}
+
+static int orte_mig_criu_restore(void) {
+    // TODO
+    return 0;
 }
