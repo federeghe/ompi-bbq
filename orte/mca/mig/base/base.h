@@ -22,6 +22,9 @@ BEGIN_C_DECLS
  */
 ORTE_DECLSPEC extern mca_base_framework_t orte_mig_base_framework;
 
+/* Export destination node to other modules, they may need it to send dumped process data */
+ORTE_DECLSPEC extern char mig_dest[256];
+
 /* select a component */
 ORTE_DECLSPEC int orte_mig_base_select(void);
 
@@ -31,6 +34,8 @@ ORTE_DECLSPEC int orte_mig_base_prepare_migration(orte_job_t *jdata,
                                             char *dest_name);
 
 ORTE_DECLSPEC int orte_mig_base_fwd_info(int flag);
+
+ORTE_DECLSPEC int orte_mig_base_migrate(char *path);
 
 /*
  * globals that might be needed

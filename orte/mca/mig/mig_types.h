@@ -20,6 +20,9 @@
 
 // Constants for information forwarding
 #define ORTE_MIG_READY 0
+#define ORTE_MIG_ONGOING 1
+#define ORTE_MIG_ABORTED 2
+#define ORTE_MIG_SUCCEEDED 3
 
 
 BEGIN_C_DECLS

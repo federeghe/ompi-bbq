@@ -22,7 +22,7 @@ sources = \
 # (for static builds).
 
 if MCA_BUILD_orte_mig_criu_DSO
-lib =
+lib = 
 lib_sources = 
 component = mca_mig_criu.la
 component_sources = $(sources)
@@ -32,6 +32,7 @@ lib_sources = $(sources)
 component =
 component_sources =
 endif
+mig_criu_LIBS = -lcriu
 
 mcacomponentdir = $(ompilibdir)
 mcacomponent_LTLIBRARIES = $(component)

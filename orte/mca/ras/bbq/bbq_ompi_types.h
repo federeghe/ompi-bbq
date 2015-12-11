@@ -20,7 +20,7 @@
 #define BBQ_CMD_MIGRATION_SUCCEEDED 7
 
 /* Options */
-#define BBQ_OPT_MIG_AVAILABLE 0
+#define BBQ_OPT_MIG_AVAILABLE 1
 
 #include <stdint.h>
 

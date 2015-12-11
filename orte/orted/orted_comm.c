@@ -1132,11 +1132,6 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     /* ** MIGRATION ** */
     case ORTE_DAEMON_MIG_PREPARE:
         opal_output(0, "%s orted: command ORTE_DAEMON_MIG_PREPARE received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-        
-
-
-        /* Create the Named pipe to sync with the HNP during a migration */
-        int my_pid = getpid();
 
         /* unpack the process name of the migrating node */
         n = 1;
@@ -1190,7 +1185,6 @@ void orted_mig_callback(int status, orte_process_name_t *peer,
     
     char hostname[100];
     gethostname(hostname, 100);
-    fprintf(stderr, "++++++++++++ orte_mig_callback on %s\n", hostname);
     
     fpid = getpid();
     

@@ -326,7 +326,7 @@ static int send_cmd_node_request(void)
     int i;
     
     command.flags = 0;
-    if(NULL != orte_mig_base.active_module && orte_mig_base.active_module->state == MIG_AVAILABLE){
+    if(NULL != orte_mig_base.active_module && orte_mig_base.active_module->get_state() == MIG_AVAILABLE){
         command.flags |= BBQ_OPT_MIG_AVAILABLE;
     }
     
@@ -440,6 +440,9 @@ static int send_mig_info(uint8_t state){
     switch(state){
         case ORTE_MIG_READY:
             command.cmd_type = BBQ_CMD_MIGRATION_READY;
+            break;
+        case ORTE_MIG_ONGOING:
+            command.cmd_type = BBQ_CMD_MIGRATION_ONGOING;
             break;
         default:
             opal_output_verbose(0, orte_ras_base_framework.framework_output,

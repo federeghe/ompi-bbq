@@ -32,9 +32,14 @@ typedef int (*orte_mig_base_module_prepare_migration_fn_t)(orte_job_t *jdata,
                                                   char *dest_name);
 
 /**
- * Start process migration.
+ * Dump migrating process.
  */
-typedef int (*orte_mig_base_module_migrate_fn_t)(pid_t fpid);
+typedef int (*orte_mig_base_module_dump_fn_t)(pid_t fpid);
+
+/**
+ * Migrate process to destination node.
+ */
+typedef int (*orte_mig_base_module_migrate_fn_t)(char *path);
 
 /**
  * Forwards migration info to the framework communicating with resources manager
@@ -47,24 +52,36 @@ typedef int (*orte_mig_base_module_fwd_info_fn_t)(int flag);
  */
 typedef int (*orte_mig_base_module_finalize_fn_t)(void);
 
+/*
+ *  Returns the module name
+ */
+typedef char *(*orte_mig_base_module_get_name_fn_t)(void);
+
+/*
+ *  Returns the module state
+ */
+typedef char *(*orte_mig_base_module_get_state_fn_t)(void);
+
 /**
  * MIG module structure
  */
 struct orte_mig_base_module_2_0_0_t {
     /** Initialization function pointer */
-    orte_mig_base_module_init_fn_t          init;
+    orte_mig_base_module_init_fn_t              init;
     /** Prepare migration function pointer */
     orte_mig_base_module_prepare_migration_fn_t prepare_migration;
+    /** Dump function pointer */
+    orte_mig_base_module_dump_fn_t              dump;
     /** Migrate function pointer */
-    orte_mig_base_module_migrate_fn_t      migrate;
+    orte_mig_base_module_migrate_fn_t           migrate;
     /** Forward info function pointer */
-    orte_mig_base_module_fwd_info_fn_t      fwd_info;
+    orte_mig_base_module_fwd_info_fn_t          fwd_info;
     /** Finalize function pointer */
-    orte_mig_base_module_finalize_fn_t      finalize;
+    orte_mig_base_module_finalize_fn_t          finalize;
     /** State of the active module, may be needed*/
-    orte_mig_migration_state_t state;
+    orte_mig_base_module_get_state_fn_t         get_state;
     /** Name of the active module, to be passed to daemons*/
-    char *name;
+    orte_mig_base_module_get_name_fn_t          get_name;
 };
 /** Convenience typedef */
 typedef struct orte_mig_base_module_2_0_0_t orte_mig_base_module_2_0_0_t;

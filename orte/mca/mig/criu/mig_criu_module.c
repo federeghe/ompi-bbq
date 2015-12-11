@@ -33,6 +33,7 @@
 #ifdef HAVE_ARPA_INET_H
 #include <arpa/inet.h>
 #endif
+#include <errno.h>
 
 #include "orte/mca/state/state.h"
 #include "orte/mca/errmgr/errmgr.h"
@@ -55,63 +56,102 @@
 
 
 static int init(void);
-static int orte_mig_criu_migrate(pid_t fpid);
+static int orte_mig_criu_dump(pid_t fpid);
 static int orte_mig_criu_finalize(void);
-
+static char *orte_mig_criu_get_name(void);
+static orte_mig_migration_state_t orte_mig_criu_get_state(void);
 /*
  * Global variables
  */
 
 orte_job_t *mig_job;
 orte_process_name_t mig_orted;
-char name[]="criu";
+orte_mig_migration_state_t mig_state;
 
 orte_mig_base_module_t orte_mig_criu_module = {
     init,
     orte_mig_base_prepare_migration,
-    orte_mig_criu_migrate,
+    orte_mig_criu_dump,
+    orte_mig_base_migrate,
     orte_mig_base_fwd_info,
     orte_mig_criu_finalize,
-    MIG_NULL,
-    name
+    orte_mig_criu_get_state,
+    orte_mig_criu_get_name  
 };
 
 static int init(void){
     /*TODO: checks to flag us as available*/
-    orte_mig_base.active_module->state = MIG_AVAILABLE;
+    mig_state = MIG_AVAILABLE;
     opal_output_verbose(0, orte_mig_base_framework.framework_output,
                 "%s mig:criu: Criu module initialized.",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-    char hostname[100];
-    gethostname(hostname, 100);
-    fprintf(stderr, "++++++++++++ I'm MIG on %s\n", hostname);
     return ORTE_SUCCESS;
 }
 
-static int orte_mig_criu_migrate(pid_t fpid){
+static int orte_mig_criu_dump(pid_t fpid){
     int dir;
+    char path[20];
+    char pid[10];
     
-    char hostname[100];
-    gethostname(hostname, 100);
-    fprintf(stderr, "++++++++++++ I'm CRIU on %s\n", hostname);
+    strcpy(path, "/tmp/");
+    sprintf(pid, "%d", fpid);
+    strcat(path,pid);
+    
+    opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:criu Setting parameters", 
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    
+    if(0 != mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)){
+        opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig: Error while creating dump folder", 
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+    
     criu_init_opts();
     criu_set_pid(fpid);
-
-    dir = open("/tmp/dump", O_DIRECTORY);
+    
+    if(0 > (dir = open(path, O_DIRECTORY))){
+        opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:criu Error while opening folder", 
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+        
     criu_set_images_dir_fd(dir);
 
+    opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:criu Dumping father process", 
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    
     if(0 > criu_dump()){
-        opal_output(0, "%s orted: Error dumping father process", 
-            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-        return;
+        opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:criu Error while dumping father process", 
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
     }
 
-    opal_output(0, "%s orted: Daemon successfully dumped", 
-            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    mig_state = MIG_MOVING;
+    
+    opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:criu Father process dumped", 
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    
+    //TODO: zip file, call migrate()
+    
     return ORTE_SUCCESS;
 }
 
 
 static int orte_mig_criu_finalize(void){
     return ORTE_SUCCESS;
+}
+
+
+static char *orte_mig_criu_get_name(void){
+    return "criu";
+}
+
+static orte_mig_migration_state_t orte_mig_criu_get_state(void){
+    return mig_state;
 }

@@ -22,6 +22,15 @@
 #include "orte/constants.h"
 #include "orte/types.h"
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+
 #include "orte/mca/state/state.h"
 #include "orte/mca/errmgr/errmgr.h"
 #include "orte/runtime/orte_globals.h"
@@ -56,7 +65,7 @@ int orte_mig_base_prepare_migration(orte_job_t *jdata,
     strcpy(mig_src, src_name);
     strcpy(mig_dest, dest_name);
     mig_job = jdata;
-
+    
     // Search the source node in the pool, so we can get the info of orted.
     int i=0;
     orte_node_t* node;
@@ -94,7 +103,7 @@ int orte_mig_base_fwd_info(int flag){
 
             break;
         case ORTE_MIG_READY_FLAG:
-            orte_ras_base.active_module->send_mig_info(BBQ_CMD_MIGRATION_ONGOING);
+            orte_ras_base.active_module->send_mig_info(ORTE_MIG_ONGOING);
             orte_oob_base_mig_event(ORTE_MIG_EXEC, &mig_orted);
             orte_plm.mig_restore(mig_dest, &mig_orted);
         break;
@@ -103,5 +112,50 @@ int orte_mig_base_fwd_info(int flag){
                 "%s mig:criu: Unknown message to forward.",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     }
+    return ORTE_SUCCESS;
+}
+
+int orte_mig_base_migrate(char *path){    
+    short dest_port = 2693;
+    struct sockaddr_in addr;
+    int socket_fd;
+    
+    /* Open socket towards destination node to send dump directory */
+    
+    if(0 > (socket_fd = socket(AF_INET,SOCK_STREAM,0)))
+    {
+        opal_output_verbose(0, orte_mig_base_framework.framework_output,
+                    "%s orted:mig:criu Cannot create socket.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+    
+    opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:criu Connecting to destination node...", 
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    
+    bzero(&addr, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = inet_addr(mig_dest);
+    addr.sin_port = htons(dest_port);
+    
+    if(0>connect(socket_fd,(struct sockaddr *)&addr, sizeof(addr)))
+    {
+        opal_output_verbose(0, orte_mig_base_framework.framework_output,
+                    "%s orted:mig:criu Can't connect to destination node.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+    
+    opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:criu Connected to destination node", 
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    
+    opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:criu Compressing folder...", 
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    
+    //TODO: send file in path
+    
     return ORTE_SUCCESS;
 }
