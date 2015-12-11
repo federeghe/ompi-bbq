@@ -30,6 +30,7 @@ SUBDIRS += \
 	tools/orte-ps \
 	tools/orte-restart \
 	tools/orted \
+        tools/orted-restore \
 	tools/orterun \
 	tools/wrappers \
         tools/orte-top \
@@ -45,6 +46,7 @@ DIST_SUBDIRS += \
 	tools/orte-ps \
 	tools/orte-restart \
 	tools/orted \
+        tools/orted-restore \
 	tools/orterun \
 	tools/wrappers \
         tools/orte-top \

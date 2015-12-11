@@ -60,6 +60,7 @@ static int orte_mig_criu_dump(pid_t fpid);
 static int orte_mig_criu_finalize(void);
 static char *orte_mig_criu_get_name(void);
 static orte_mig_migration_state_t orte_mig_criu_get_state(void);
+static int orte_mig_criu_restore(void);
 /*
  * Global variables
  */
@@ -73,6 +74,7 @@ orte_mig_base_module_t orte_mig_criu_module = {
     orte_mig_base_prepare_migration,
     orte_mig_criu_dump,
     orte_mig_base_migrate,
+    orte_mig_criu_restore,
     orte_mig_base_fwd_info,
     orte_mig_criu_finalize,
     orte_mig_criu_get_state,
@@ -128,6 +130,7 @@ static int orte_mig_criu_dump(pid_t fpid){
         opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:criu Error while dumping father process", 
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
         return ORTE_ERROR;
     }
 
@@ -147,11 +150,15 @@ static int orte_mig_criu_finalize(void){
     return ORTE_SUCCESS;
 }
 
-
 static char *orte_mig_criu_get_name(void){
     return "criu";
 }
 
 static orte_mig_migration_state_t orte_mig_criu_get_state(void){
     return mig_state;
+}
+
+static int orte_mig_criu_restore(void) {
+    // TODO
+    return 0;
 }
