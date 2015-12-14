@@ -22,6 +22,8 @@
 #include "orte/constants.h"
 #include "orte/types.h"
 
+
+#include <libtar.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #ifdef HAVE_NETINET_IN_H
@@ -119,6 +121,7 @@ int orte_mig_base_migrate(char *path){
     short dest_port = 2693;
     struct sockaddr_in addr;
     int socket_fd;
+    TAR *tar;
     
     /* Open socket towards destination node to send dump directory */
     
@@ -155,7 +158,9 @@ int orte_mig_base_migrate(char *path){
                 "%s orted:mig:criu Compressing folder...", 
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
-    //TODO: send file in path
+    tar_fdopen(&tar, socket_fd, NULL, O_WRONLY, 0644, 0);
+    tar_append_tree(tar, path, ".");
+    close(socket_fd);
     
     return ORTE_SUCCESS;
 }
