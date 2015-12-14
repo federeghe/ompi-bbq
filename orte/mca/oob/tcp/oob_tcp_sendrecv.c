@@ -371,8 +371,8 @@ static int read_bytes(mca_oob_tcp_peer_t* peer)
                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
                                 ORTE_NAME_PRINT(&(peer->name)));
 #if ORTE_ENABLE_MIGRATION
-            if (mca_oob_tcp_migrating_me ||
-                (peer->name.jobid == mca_oob_tcp_migrating_peer->name.jobid &&
+            if (mca_oob_tcp_migrating_me || ( mca_oob_tcp_migrating_peer != NULL &&
+                peer->name.jobid == mca_oob_tcp_migrating_peer->name.jobid &&
                  peer->name.vpid  == mca_oob_tcp_migrating_peer->name.vpid)
                 ) {
                 peer->state = MCA_OOB_TCP_FREEZED;
