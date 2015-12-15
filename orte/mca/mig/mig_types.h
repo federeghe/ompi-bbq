@@ -35,6 +35,13 @@ typedef enum{
     MIG_ERROR
 }orte_mig_migration_state_t;
 
+
+typedef struct orte_mig_migration_info_t {
+    orte_process_name_t src_name;
+    const char* dst_host;
+} orte_mig_migration_info_t;
+
+
 END_C_DECLS
 
 #endif	/* MIG_TYPES_H */

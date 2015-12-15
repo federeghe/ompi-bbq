@@ -89,6 +89,7 @@
 
 #include "orte/mca/oob/base/base.h"
 
+char* mig_dest_host;
 orte_process_name_t mig_src_p;
 int mig_status;
 
@@ -1140,6 +1141,13 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
             goto CLEANUP;
         }
 
+        /* unpack the destination*/
+        if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &mig_dest_host, &n, OPAL_STRING))) {
+            ORTE_ERROR_LOG(ret);
+            goto CLEANUP;
+        }
+
+
         if (ORTE_PROC_MY_NAME->jobid == mig_src_p.jobid && ORTE_PROC_MY_NAME->vpid == mig_src_p.vpid ) {
             opal_output(0, "%s orted: I am the migrating node!", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             orte_oob_base_mig_event(ORTE_MIG_PREPARE, &mig_src_p);
@@ -1183,9 +1191,6 @@ void orted_mig_callback(int status, orte_process_name_t *peer,
                             void* cbdata){
     pid_t pid, fpid;
     
-    char hostname[100];
-    gethostname(hostname, 100);
-    
     fpid = getpid();
     
     orte_rml_send_callback(status,peer,buffer, tag,cbdata);
@@ -1199,15 +1204,20 @@ void orted_mig_callback(int status, orte_process_name_t *peer,
             
             pid = fork();
             
-            if(pid == 0){
+            if(pid == 0) {
+
+                pid = fork();
+                if (pid != 0) exit(0);
+
                 if (0 > setsid()){
                     opal_output(0, "%s orted: Error detaching child", 
                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                     //TODO: notify somehow the failure
-                }else{   
+                } else {
                     opal_output(0, "%s orted: Child detached, dumping father...", 
                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-                    orte_mig_base.active_module->migrate(fpid);
+                    orte_mig_base.active_module->dump(fpid);
+                    orte_mig_base.active_module->migrate(mig_dest_host,NULL);
                 }
             }
         }

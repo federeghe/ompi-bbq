@@ -35,16 +35,34 @@
 #include <errno.h>
 
 #include "opal/runtime/opal.h"
+#include "opal/util/opal_environ.h"
+
 #include "orte/mca/mig/mig.h"
 #include "orte/mca/mig/base/base.h"
 
 
 int main(int argc, char *argv[])
 {
+
     if (OPAL_SUCCESS != opal_init_util(&argc, &argv)) {
         fprintf(stderr, "OPAL failed to initialize -- orted aborting\n");
         exit(1);
     }
+
+    /* we are never allowed to operate as a distributed tool,
+     * so insist on the ess/tool component */
+    //opal_setenv("OMPI_MCA_ess", "tool", true, &environ);
+
+    /***************************
+     * We need all of OPAL and the TOOL portion of ORTE
+     ***************************/
+    if (ORTE_SUCCESS != orte_init(&argc, &argv, ORTE_PROC_NON_MPI)) {
+        fprintf(stderr, "ORTE failed to initialize -- orted aborting\n");
+        exit(1);
+
+    }
+
+    fprintf(stdout, "orted-restore inizialized.\n");
 
     orte_mig_base_select();
 

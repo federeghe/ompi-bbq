@@ -54,7 +54,6 @@
 #if ORTE_ENABLE_MIGRATION
 #include "orte/mca/mig/mig_types.h"
 
-orte_process_name_t *migrating_node = NULL;
 
 #endif
 
@@ -239,15 +238,18 @@ int orte_plm_base_orted_signal_local_procs(orte_jobid_t job, int32_t signal)
 
 #if ORTE_ENABLE_MIGRATION
 int orte_plm_mig_event(int event, void *data) {
+    static char *to_send;
+
+    orte_mig_migration_info_t *mig_info = NULL;
     int rc;
     opal_buffer_t cmd;
     orte_daemon_cmd_flag_t command;
-    
+
     switch(event){
         case ORTE_MIG_PREPARE:
             command = ORTE_DAEMON_MIG_PREPARE;
-            migrating_node = data;
-            
+            mig_info = data;
+            to_send = strdup(mig_info->dst_host);
             OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
                          "%s plm:base:orted_mig_event sending ORTE_DAEMON_MIG_PREPARE to daemons",
                          ORTE_NAME_PRINT(ORTE_PROC_MY_NAME)));
@@ -262,11 +264,19 @@ int orte_plm_mig_event(int event, void *data) {
             }
 
             /* pack the process name of orted of the migrating node */
-            if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, data, 1, ORTE_NAME))) {
+            if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, &(mig_info->src_name), 1, ORTE_NAME))) {
                 ORTE_ERROR_LOG(rc);
                 OBJ_DESTRUCT(&cmd);
                 return rc;
             }
+
+            /* pack the ip of the hostname of destination node */
+            if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, &to_send, 1, OPAL_STRING))) {
+                ORTE_ERROR_LOG(rc);
+                OBJ_DESTRUCT(&cmd);
+                return rc;
+            }
+
 
             break;
             

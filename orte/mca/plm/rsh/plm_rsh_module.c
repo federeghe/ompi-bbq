@@ -103,11 +103,15 @@ static int rsh_launch(orte_job_t *jdata);
 static int remote_spawn(opal_buffer_t *launch);
 static int rsh_terminate_orteds(void);
 static int rsh_finalize(void);
+static int rsh_mig_event(int event, void *data);
 
 #if ORTE_ENABLE_MIGRATION
 #include "orte/mca/mig/base/base.h"
 static int rsh_checkpoint(const orte_process_name_t* proc);
 static int rsh_restore(const char *new_hostname, const orte_process_name_t* proc);
+
+orte_process_name_t *daemon_mig_name=NULL;
+
 #endif
 
 orte_plm_base_module_t orte_plm_rsh_module = {
@@ -120,7 +124,7 @@ orte_plm_base_module_t orte_plm_rsh_module = {
     orte_plm_base_orted_kill_local_procs,
     orte_plm_base_orted_signal_local_procs,
 #if ORTE_ENABLE_MIGRATION
-    orte_plm_mig_event,
+    rsh_mig_event,
     rsh_checkpoint,
     rsh_restore,
 #endif
@@ -284,7 +288,7 @@ static void rsh_wait_daemon(pid_t pid, int status, void* cbdata)
         return;
     }
 
-    if(migrating_node != NULL && daemon->name.vpid == migrating_node->vpid) {
+    if(daemon_mig_name != NULL && daemon->name.vpid == daemon_mig_name->vpid) {
         OPAL_OUTPUT_VERBOSE((1, orte_plm_base_framework.framework_output,
                              "%s daemon %s exit with status %d (checkpointed!)",
                              ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
@@ -1680,12 +1684,18 @@ static int rsh_restore(const char *new_hostname, const orte_process_name_t* proc
 
     orte_plm_rsh_caddy_t *caddy;
 
-    char **argv = malloc(sizeof(const char*)*4);
+    char **argv = malloc(sizeof(const char*)*10);
 
     argv[0] = strdup("-t");
     argv[1] = strdup(new_hostname);
     argv[2] = strdup("orted-restore");
-    argv[3] = NULL;
+    argv[3] = strdup("-mca");
+    argv[4] = strdup("orte_debug_daemons");
+    argv[5] = strdup("\"1\"");
+    argv[6] = strdup("-mca");
+    argv[7] = strdup("mig_base_verbose");
+    argv[8] = strdup("100");
+    argv[9] = NULL;
 
     caddy = OBJ_NEW(orte_plm_rsh_caddy_t);
     caddy->argc = 3;
@@ -1696,13 +1706,29 @@ static int rsh_restore(const char *new_hostname, const orte_process_name_t* proc
     caddy->daemon->name.vpid = proc->vpid;
     opal_list_append(&launch_list, &caddy->super);
 
-    opal_event_active(&launch_event, EV_WRITE, 1);  // Launch!
+    OPAL_OUTPUT_VERBOSE((1, orte_plm_base_framework.framework_output,
+                         "%s plm:rsh: rsh_restore: starting process_launch_list",
+                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME)));
+
+
+//    opal_event_active(&launch_event, EV_WRITE, 1);  // Launch!
+
+    process_launch_list(0,0,NULL);  // Call the launch event manually
+                                    // we need a blocking call here
 
     opal_argv_free(argv);
 
     return ORTE_SUCCESS;
 }
 
+static int rsh_mig_event(int event, void *data) {
+
+    if (event == ORTE_MIG_PREPARE) {
+        daemon_mig_name = &(((orte_mig_migration_info_t *)data)->src_name);
+    }
+
+    return orte_plm_mig_event(event, data);
+}
 
 #endif
 

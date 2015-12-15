@@ -61,6 +61,7 @@ static int orte_mig_criu_finalize(void);
 static char *orte_mig_criu_get_name(void);
 static orte_mig_migration_state_t orte_mig_criu_get_state(void);
 static int orte_mig_criu_restore(void);
+static int orte_mig_criu_migrate(char *host, char *);
 /*
  * Global variables
  */
@@ -69,11 +70,13 @@ orte_job_t *mig_job;
 orte_process_name_t mig_orted;
 orte_mig_migration_state_t mig_state;
 
+char dump_path[25];
+
 orte_mig_base_module_t orte_mig_criu_module = {
     init,
     orte_mig_base_prepare_migration,
     orte_mig_criu_dump,
-    orte_mig_base_migrate,
+    orte_mig_criu_migrate,
     orte_mig_criu_restore,
     orte_mig_base_fwd_info,
     orte_mig_criu_finalize,
@@ -92,18 +95,14 @@ static int init(void){
 
 static int orte_mig_criu_dump(pid_t fpid){
     int dir;
-    char path[20];
-    char pid[10];
     
-    strcpy(path, "/tmp/");
-    sprintf(pid, "%d", fpid);
-    strcat(path,pid);
+    sprintf(dump_path, "/tmp/ckpt_%d", fpid);
     
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:criu Setting parameters", 
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
-    if(0 != mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)){
+    if(0 != mkdir(dump_path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)){
         opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig: Error while creating dump folder", 
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
@@ -113,7 +112,7 @@ static int orte_mig_criu_dump(pid_t fpid){
     criu_init_opts();
     criu_set_pid(fpid);
     
-    if(0 > (dir = open(path, O_DIRECTORY))){
+    if(0 > (dir = open(dump_path, O_DIRECTORY))){
         opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:criu Error while opening folder", 
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
@@ -128,20 +127,19 @@ static int orte_mig_criu_dump(pid_t fpid){
     
     if(0 > criu_dump()){
         opal_output_verbose(0,orte_mig_base_framework.framework_output,
-                "%s orted:mig:criu Error while dumping father process", 
-                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                "%s orted:mig:criu Unable to dump parent process, error %d",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), errno);
 
         return ORTE_ERROR;
     }
 
     mig_state = MIG_MOVING;
-    
-    opal_output_verbose(0,orte_mig_base_framework.framework_output,
-                "%s orted:mig:criu Father process dumped", 
-                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-    
-    //TODO: zip file, call migrate()
-    
+
+    // Inutile non arriverebbe a nessuno
+//    opal_output_verbose(0,orte_mig_base_framework.framework_output,
+//                "%s orted:mig:criu Father process dumped",
+//                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
     return ORTE_SUCCESS;
 }
 
@@ -158,7 +156,33 @@ static orte_mig_migration_state_t orte_mig_criu_get_state(void){
     return mig_state;
 }
 
+static int orte_mig_criu_migrate(char* host, char* path) {
+    (void) path;    // Ignored
+    return orte_mig_base_migrate(host,dump_path);
+}
+
 static int orte_mig_criu_restore(void) {
-    // TODO
-    return 0;
+    if ( orte_mig_base_restore("/tmp/ckpt_restore") != ORTE_SUCCESS) {
+        return ORTE_ERROR;
+    }
+    int dir;
+
+    criu_init_opts();
+    if(0 > (dir = open("/tmp/ckpt_restore", O_DIRECTORY))){
+        opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:criu Error while opening folder",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+
+    criu_set_images_dir_fd(dir);
+
+    fopen("/tmp/aaa_pre","w");
+    criu_restore();
+    fopen("/tmp/aaa_post","w");
+
+
+    return ORTE_SUCCESS;
+
+
 }

@@ -66,8 +66,7 @@ ORTE_DECLSPEC void orte_plm_base_registered(int fd, short args, void *cbdata);
 ORTE_DECLSPEC int orte_plm_base_fork_hnp(void);
 
 #if ORTE_ENABLE_MIGRATION
-extern orte_process_name_t *migrating_node;
-
+#include "orte/mca/mig/base/base.h"
 #endif
 
 END_C_DECLS
