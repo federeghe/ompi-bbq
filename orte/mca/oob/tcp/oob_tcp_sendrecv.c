@@ -367,9 +367,9 @@ static int read_bytes(mca_oob_tcp_peer_t* peer)
              * and let the caller know
              */
             opal_output_verbose(OOB_TCP_DEBUG_FAIL, orte_oob_base_framework.framework_output,
-                                "%s-%s mca_oob_tcp_msg_recv: peer closed connection", 
+                                "%s-%s mca_oob_tcp_msg_recv: peer closed connection on SD %d",
                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
-                                ORTE_NAME_PRINT(&(peer->name)));
+                                ORTE_NAME_PRINT(&(peer->name)), peer->sd);
 #if ORTE_ENABLE_MIGRATION
             if (mca_oob_tcp_migrating_me || ( mca_oob_tcp_migrating_peer != NULL &&
                 peer->name.jobid == mca_oob_tcp_migrating_peer->name.jobid &&
@@ -630,6 +630,7 @@ void mca_oob_tcp_recv_handler(int sd, short flags, void *cbdata)
                     ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
                     ORTE_NAME_PRINT(&(peer->name)),
                     peer->state);
+        //exit(1);    // TODO: remove
         // mca_oob_tcp_peer_close(peer);
         break;
     }

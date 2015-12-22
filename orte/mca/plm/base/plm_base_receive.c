@@ -438,7 +438,10 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
         
         /* Daemon has finished migrating */
         case ORTE_MIG_DONE_FLAG:
-            //TODO
+            opal_output_verbose(5, orte_plm_base_framework.framework_output,
+                                                            "%s plm:base:receive done received from migrated node",
+                                                            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            orte_mig_base.active_module->fwd_info(flag);
             break;
             
         default:

@@ -44,6 +44,10 @@
 int main(int argc, char *argv[])
 {
 
+    char hostname[1024];
+    gethostname(hostname, 1024);
+
+
     if (OPAL_SUCCESS != opal_init_util(&argc, &argv)) {
         fprintf(stderr, "OPAL failed to initialize -- orted aborting\n");
         exit(1);
@@ -62,12 +66,18 @@ int main(int argc, char *argv[])
 
     }
 
-    fprintf(stdout, "orted-restore inizialized.\n");
+    fprintf(stdout, "[%s] orted-restore: inizialized.\n", hostname);
+
+    fflush(stdout); // Avoid double print during fork
 
     orte_mig_base_select();
 
-    orte_mig_base.active_module->restore();
+    if (OPAL_SUCCESS != orte_mig_base.active_module->restore() ) {
+        fprintf(stderr, "[%s] orted-restore: failed to restore.\n", hostname);
+        exit(1);
+    }
 
+    fprintf(stdout, "[%s] orted-restore: success.\n", hostname);
 
     return 0;
 }

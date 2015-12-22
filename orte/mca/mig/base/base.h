@@ -32,7 +32,7 @@ ORTE_DECLSPEC int orte_mig_base_prepare_migration(orte_job_t *jdata,
 
 ORTE_DECLSPEC int orte_mig_base_fwd_info(int flag);
 
-ORTE_DECLSPEC int orte_mig_base_migrate(char *host, char *path);
+ORTE_DECLSPEC int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore);
 
 ORTE_DECLSPEC int orte_mig_base_restore(char *path);
 

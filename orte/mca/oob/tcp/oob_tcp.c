@@ -87,7 +87,7 @@ static void ft_event(int state);
 
 #if ORTE_ENABLE_MIGRATION
 	static void mig_event(int event, void* data);
-	static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest);
+	static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest, const int port);
 	static void mig_me(bool defreezing);
 #endif
 
@@ -220,6 +220,12 @@ static void accept_connection(const int accepted_fd,
                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
                         opal_net_get_hostname(addr),
                         opal_net_get_port(addr));
+
+#ifdef ORTE_ENABLE_MIGRATION
+    if (mca_oob_tcp_migrating_peer != NULL) {
+        mig_done(mca_oob_tcp_migrating_peer, opal_net_get_hostname(addr),opal_net_get_port(addr) );
+    }
+#endif
 
    /* setup socket options */
     orte_oob_tcp_set_socket_options(accepted_fd);
@@ -604,20 +610,27 @@ static void recv_handler(int sd, short flg, void *cbdata)
     int flags;
     uint64_t *ui64;
     mca_oob_tcp_hdr_t hdr;
-    mca_oob_tcp_peer_t *peer;
+    mca_oob_tcp_peer_t *peer=NULL;
+
+#ifdef ORTE_ENABLE_MIGRATION
+    peer = mca_oob_tcp_migrating_peer;
+    if (peer != NULL) {
+        peer->state = MCA_OOB_TCP_CONNECT_ACK;
+    }
+#endif
 
     opal_output_verbose(OOB_TCP_DEBUG_CONNECT, orte_oob_base_framework.framework_output,
                         "%s:tcp:recv:handler called",
                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
     /* get the handshake */
-    if (ORTE_SUCCESS != mca_oob_tcp_peer_recv_connect_ack(NULL, sd, &hdr)) {
+    if (ORTE_SUCCESS != mca_oob_tcp_peer_recv_connect_ack(peer, sd, &hdr)) {
         goto cleanup;
     }
 
     /* finish processing ident */
     if (MCA_OOB_TCP_IDENT == hdr.type) {
-        if (NULL == (peer = mca_oob_tcp_peer_lookup(&hdr.origin))) {
+        if (peer == NULL && (NULL == (peer = mca_oob_tcp_peer_lookup(&hdr.origin)))) {
             /* should never happen */
             mca_oob_tcp_peer_close(peer);
             goto cleanup;
@@ -816,7 +829,7 @@ static void mig_event(int event, void* data) {
     	if (AM_I_NODE(&peer_name)) {
             mig_me(true);
     	} else {
-            mig_done(mca_oob_tcp_migrating_peer, (const char*)data);
+            mca_oob_tcp_migrating_peer = NULL;
     	}
     break;
 
@@ -842,6 +855,9 @@ static void oob_mig_freeze_defreeze(bool defreezing, mca_oob_tcp_peer_t* peer) {
         peer->state = MCA_OOB_TCP_FREEZED;
         mca_oob_tcp_peer_close(peer);
     } else {
+        peer->state = MCA_OOB_TCP_UNCONNECTED;
+        return;
+
         // And now, reconnect!
         peer->state = MCA_OOB_TCP_CONNECTING;
         // Events will be reactivated here:
@@ -886,7 +902,7 @@ static void mig_me(bool defreezing) {
 }
 
 
-static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest) {
+static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest, const int port) {
     char *peer_name=NULL;
 
     // Get the converted peer string
@@ -895,17 +911,26 @@ static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest) {
     // Now transform it in: 000000.0;tcp:// ....
     int uri_len  = strlen(uri_dest);
     int peer_len = strlen(peer_name);
-    peer_name = realloc(peer_name, uri_len+peer_len+2);
-    peer_name[peer_len]   = ';';
+    peer_name = realloc(peer_name, uri_len+peer_len+6+3);
+    sprintf(peer_name+peer_len,";tcp://%s:%d", uri_dest, port);
+/*    peer_name[peer_len]   = ';';
     peer_name[peer_len+1] = '\0';
+    strcat(peer_name, "tcp://");
     strcat(peer_name, uri_dest);
+    strcat(peer_name, ":");
+    strcat(peer_name, ":");
+*/
+    opal_output_verbose(2, orte_oob_base_framework.framework_output,
+                                    "%s new peer name: %s",
+                                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                                    peer_name);
 
     // Let's update the peer hash table
     process_uri(peer_name);
 
     // And now, reconnect!
-    peer->state = MCA_OOB_TCP_CONNECTING;
-    ORTE_ACTIVATE_TCP_CONN_STATE(peer, mca_oob_tcp_peer_try_connect);
+//    peer->state = MCA_OOB_TCP_CONNECTED;
+//    ORTE_ACTIVATE_TCP_CONN_STATE(peer, mca_oob_tcp_peer_try_connect);
 
 }
 

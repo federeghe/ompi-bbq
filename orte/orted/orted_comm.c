@@ -1186,27 +1186,65 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
 #if ORTE_ENABLE_MIGRATION
 
+sighandler_t prev_handler;
+
+// Called by orted-restore signal when we are restoring
+static void orted_mig_restore_sig(int sig) {
+    if (OPAL_UNLIKELY(sig != SIGUSR1)) {
+        // ???
+        return;
+    }
+
+    fprintf(stdout, "Signal handler called.\n");
+    fflush(stdout);
+
+    // Restore the original signal handler for USR1
+    signal(SIGUSR1, prev_handler);
+
+    mig_status = ORTE_DAEMON_MIG_DONE;
+
+    // Reopen connection towards HNP
+    orte_oob_base_mig_event(ORTE_MIG_DONE, NULL);
+
+    // Declare some variables to send the done flag
+    orte_daemon_cmd_flag_t command;
+    int ret;
+    opal_buffer_t *answer;
+    uint8_t flag;
+
+    // Ehy HNP, I'm alive!
+    SEND_MIG_ACK(ORTE_MIG_DONE_FLAG);
+
+    fprintf(stdout, "Signal handler end.\n");
+    fflush(stdout);
+
+}
+
 void orted_mig_callback(int status, orte_process_name_t *peer,
                             opal_buffer_t* buffer, orte_rml_tag_t tag,
                             void* cbdata){
+    // Super-call
+    orte_rml_send_callback(status,peer,buffer, tag,cbdata);
+
     pid_t pid, fpid;
-    
     fpid = getpid();
     
-    orte_rml_send_callback(status,peer,buffer, tag,cbdata);
-    
-    signal(SIGUSR1, NULL);
     
     if (mig_status == ORTE_DAEMON_MIG_EXEC) {
         if (ORTE_PROC_MY_NAME->jobid == mig_src_p.jobid && ORTE_PROC_MY_NAME->vpid == mig_src_p.vpid ) {
             opal_output(0, "%s orted: I am the migrating node! Exec migration!", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
+            // Set the signal handler that will be executed during restore
+            // after the signal throw by orted-restore
+            prev_handler = signal(SIGUSR1, orted_mig_restore_sig);
+
             orte_oob_base_mig_event(ORTE_MIG_EXEC, &mig_src_p);
             
             pid = fork();
             
             if(pid == 0) {
-
-                pid = fork();
+                pid = fork();   // Double fork to daemonize
+                                // FIXME: it's really necessary?
                 if (pid != 0) exit(0);
 
                 if (0 > setsid()){
@@ -1217,7 +1255,7 @@ void orted_mig_callback(int status, orte_process_name_t *peer,
                     opal_output(0, "%s orted: Child detached, dumping father...", 
                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                     orte_mig_base.active_module->dump(fpid);
-                    orte_mig_base.active_module->migrate(mig_dest_host,NULL);
+                    orte_mig_base.active_module->migrate(mig_dest_host,NULL,fpid);
                 }
             }
         }

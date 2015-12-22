@@ -444,6 +444,9 @@ static int send_mig_info(uint8_t state){
         case ORTE_MIG_ONGOING:
             command.cmd_type = BBQ_CMD_MIGRATION_ONGOING;
             break;
+        case ORTE_MIG_DONE:
+            command.cmd_type = BBQ_CMD_MIGRATION_SUCCEEDED;
+            break;
         default:
             opal_output_verbose(0, orte_ras_base_framework.framework_output,
                 "%s ras:bbq: send_mig_info received unknown flag.",

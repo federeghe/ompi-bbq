@@ -39,7 +39,7 @@ typedef int (*orte_mig_base_module_dump_fn_t)(pid_t fpid);
 /**
  * Migrate process to destination node.
  */
-typedef int (*orte_mig_base_module_migrate_fn_t)(char *host, char *path);
+typedef int (*orte_mig_base_module_migrate_fn_t)(char *host, char *path, int pid_to_restore);
 
 /**
  * Forwards migration info to the framework communicating with resources manager

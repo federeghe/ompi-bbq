@@ -1684,18 +1684,16 @@ static int rsh_restore(const char *new_hostname, const orte_process_name_t* proc
 
     orte_plm_rsh_caddy_t *caddy;
 
-    char **argv = malloc(sizeof(const char*)*10);
+    char **argv = malloc(sizeof(const char*)*8);
 
     argv[0] = strdup("-t");
     argv[1] = strdup(new_hostname);
     argv[2] = strdup("orted-restore");
-    argv[3] = strdup("-mca");
-    argv[4] = strdup("orte_debug_daemons");
-    argv[5] = strdup("\"1\"");
-    argv[6] = strdup("-mca");
-    argv[7] = strdup("mig_base_verbose");
-    argv[8] = strdup("100");
-    argv[9] = NULL;
+    argv[3] = strdup("-debug-daemons");
+    argv[4] = strdup("-mca");
+    argv[5] = strdup("mig_base_verbose");
+    argv[6] = strdup("100");
+    argv[7] = NULL;
 
     caddy = OBJ_NEW(orte_plm_rsh_caddy_t);
     caddy->argc = 3;

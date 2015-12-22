@@ -27,6 +27,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #endif
@@ -54,6 +55,7 @@
 
 #include "criu/criu.h"
 
+#define RESTORE_PATH_PREFIX "/tmp/ckpt_"
 
 static int init(void);
 static int orte_mig_criu_dump(pid_t fpid);
@@ -61,7 +63,7 @@ static int orte_mig_criu_finalize(void);
 static char *orte_mig_criu_get_name(void);
 static orte_mig_migration_state_t orte_mig_criu_get_state(void);
 static int orte_mig_criu_restore(void);
-static int orte_mig_criu_migrate(char *host, char *);
+static int orte_mig_criu_migrate(char *host, char *, pid_t);
 /*
  * Global variables
  */
@@ -110,6 +112,8 @@ static int orte_mig_criu_dump(pid_t fpid){
     }
     
     criu_init_opts();
+    criu_set_log_file("criu_dump.log");
+    criu_set_log_level(4);
     criu_set_pid(fpid);
     
     if(0 > (dir = open(dump_path, O_DIRECTORY))){
@@ -120,6 +124,7 @@ static int orte_mig_criu_dump(pid_t fpid){
     }
         
     criu_set_images_dir_fd(dir);
+    //criu_set_shell_job(true);
 
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:criu Dumping father process", 
@@ -132,6 +137,11 @@ static int orte_mig_criu_dump(pid_t fpid){
 
         return ORTE_ERROR;
     }
+
+    opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:criu Dumped",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
 
     mig_state = MIG_MOVING;
 
@@ -156,19 +166,43 @@ static orte_mig_migration_state_t orte_mig_criu_get_state(void){
     return mig_state;
 }
 
-static int orte_mig_criu_migrate(char* host, char* path) {
+static int orte_mig_criu_migrate(char* host, char* path, int pid_to_restore) {
     (void) path;    // Ignored
-    return orte_mig_base_migrate(host,dump_path);
+    return orte_mig_base_migrate(host,dump_path, pid_to_restore);
 }
 
+static void gen_random(char *s, const int len) {
+    static const char alphanum[] =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+
+    for (int i = 0; i < len; ++i) {
+        s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+    }
+
+    s[len] = '\0';
+}
+
+
 static int orte_mig_criu_restore(void) {
-    if ( orte_mig_base_restore("/tmp/ckpt_restore") != ORTE_SUCCESS) {
+    // Generate a random string for the directory
+    srand(time(NULL));
+    int prefix_len = strlen(RESTORE_PATH_PREFIX);
+    char* path = malloc(sizeof(char)*(prefix_len + 10 ));
+    strcpy(path, RESTORE_PATH_PREFIX);
+    gen_random(path + prefix_len, 5);
+
+    int pid_to_restore = orte_mig_base_restore(path);
+
+    if ( pid_to_restore < 0 ) {
         return ORTE_ERROR;
     }
+
     int dir;
 
     criu_init_opts();
-    if(0 > (dir = open("/tmp/ckpt_restore", O_DIRECTORY))){
+    if(0 > (dir = open(path, O_DIRECTORY))){
         opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:criu Error while opening folder",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
@@ -176,11 +210,19 @@ static int orte_mig_criu_restore(void) {
     }
 
     criu_set_images_dir_fd(dir);
+    //criu_set_shell_job(true);
+    criu_set_log_file("criu_restore.log");
+    criu_set_log_level(4);
+    int status = criu_restore_child();
 
-    fopen("/tmp/aaa_pre","w");
-    criu_restore();
-    fopen("/tmp/aaa_post","w");
+    if (status < 0 ) {
+        opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:criu Error during restore, please check criu_restore.log",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
 
+    kill(pid_to_restore, SIGUSR1);
 
     return ORTE_SUCCESS;
 

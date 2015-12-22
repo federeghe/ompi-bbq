@@ -116,6 +116,10 @@ int orte_mig_base_fwd_info(int flag){
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_ONGOING);
             orte_oob_base_mig_event(ORTE_MIG_EXEC, &(mig_info->src_name));
         break;
+        case ORTE_MIG_DONE_FLAG:
+            orte_ras_base.active_module->send_mig_info(ORTE_MIG_DONE);
+            orte_oob_base_mig_event(ORTE_MIG_DONE, (void*)(mig_info->dst_host));
+        break;
         default:
             opal_output_verbose(0, orte_mig_base_framework.framework_output,
                 "%s mig:criu: Unknown message to forward.",
@@ -124,7 +128,7 @@ int orte_mig_base_fwd_info(int flag){
     return ORTE_SUCCESS;
 }
 
-int orte_mig_base_migrate(char *host, char *path) {
+int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
     opal_output_verbose(0, orte_mig_base_framework.framework_output,
                 "%s orted:mig:criu copying directory %s.",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), path);
@@ -168,6 +172,8 @@ int orte_mig_base_migrate(char *host, char *path) {
                 "%s orted:mig:criu Connected to destination node. Compressing folder...",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
+    write(socket_fd, (char *)&pid_to_restore,sizeof(pid_t));
+
     tar_fdopen(&tar, socket_fd, NULL, NULL, O_WRONLY, 0644, 0);
     tar_append_tree(tar, path, ".");
     close(socket_fd);
@@ -186,6 +192,7 @@ int orte_mig_base_restore(char *path) {
     struct sockaddr_in addr, addr_cl;
     socklen_t size_addr_cl;
     int socket_fd, socket_cl;
+    int pid_to_restore;
     TAR *tar;
 
     /* Open socket towards destination node to recv dump directory */
@@ -220,6 +227,8 @@ int orte_mig_base_restore(char *path) {
                 "%s orted:mig:criu Accepted source node",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
+    read(socket_cl, (char *)&pid_to_restore,sizeof(pid_t));
+
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:criu Decompressing folder...",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
@@ -229,6 +238,6 @@ int orte_mig_base_restore(char *path) {
     tar_close(tar);
     close(socket_fd);
     
-    return ORTE_SUCCESS;
+    return pid_to_restore;
 }
 
