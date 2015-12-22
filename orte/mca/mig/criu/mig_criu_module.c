@@ -25,8 +25,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/types.h>
+#include <sys/mount.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
@@ -193,11 +194,33 @@ static int orte_mig_criu_restore(void) {
     strcpy(path, RESTORE_PATH_PREFIX);
     gen_random(path + prefix_len, 5);
 
+
     int pid_to_restore = orte_mig_base_restore(path);
 
     if ( pid_to_restore < 0 ) {
         return ORTE_ERROR;
     }
+
+    printf("MY OLD PID IS: %i\n", getpid());
+    fflush(stdout);
+    unshare(CLONE_NEWPID | CLONE_NEWNS);
+    int pid = fork();
+    if (pid != 0) {
+        int status;
+        waitpid(pid, &status, 0);
+        return status;
+    }
+    printf("MY NEW PID IS: %i\n", getpid());
+    fflush(stdout);
+
+    mount(NULL, "/proc", NULL, MS_PRIVATE | MS_REC, NULL);
+    if (mount("proc", "/proc", "proc",
+            MS_MGC_VAL | MS_NOSUID | MS_NOEXEC | MS_NODEV,
+            NULL)) {
+        fprintf(stderr, "Can't mount proc\n");
+        return ORTE_ERROR;
+    }
+
 
     int dir;
 
@@ -210,9 +233,10 @@ static int orte_mig_criu_restore(void) {
     }
 
     criu_set_images_dir_fd(dir);
-    //criu_set_shell_job(true);
     criu_set_log_file("criu_restore.log");
     criu_set_log_level(4);
+
+
     int status = criu_restore_child();
 
     if (status < 0 ) {
@@ -222,9 +246,16 @@ static int orte_mig_criu_restore(void) {
         return ORTE_ERROR;
     }
 
-    kill(pid_to_restore, SIGUSR1);
+    if (0 > kill(pid_to_restore, SIGUSR1) ) {
+        fprintf(stderr, "Can't kill process %i\n", pid_to_restore);
+        return ORTE_ERROR;
+    }
 
-    return ORTE_SUCCESS;
+    while(true) {
+        sleep(1);
+    }
+
+    exit(ORTE_SUCCESS);
 
 
 }
