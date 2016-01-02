@@ -239,7 +239,11 @@ static int orte_mig_criu_restore(void) {
         return ORTE_ERROR;
     }
 
-    while(true) {
+    // We have to wait the termination of the restored process to
+    // guarantee the output will be forwarded to ssh and then to
+    // hnp. The sleep time is not really important (this time is lost
+    // after the termination of the process)
+    while(kill(pid_to_restore, 0) != -1) {
         sleep(1);
     }
 
