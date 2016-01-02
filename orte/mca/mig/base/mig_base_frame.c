@@ -39,6 +39,14 @@ static int orte_mig_base_close(void)
         orte_mig_base.active_module->finalize();
     }
 
+    extern orte_mig_migration_info_t* mig_info;
+    if (mig_info != NULL) { // Free the resources
+        free(mig_info->dst_host);
+        free(mig_info);
+        mig_info = NULL;
+    }
+
+
     return mca_base_framework_components_close(&orte_mig_base_framework, NULL);
 }
 

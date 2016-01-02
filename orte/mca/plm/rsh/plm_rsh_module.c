@@ -650,11 +650,11 @@ static int setup_launch(int *argcptr, char ***argvptr,
     opal_argv_append_nosize(&argv, "plm");
     opal_argv_append_nosize(&argv, "rsh");
     
-#if ORTE_ENABLE_MIGRATION
+/*#if ORTE_ENABLE_MIGRATION
     opal_argv_append_nosize(&argv, "-mca");
     opal_argv_append_nosize(&argv, "mig");
     opal_argv_append_nosize(&argv, orte_mig_base.active_module->get_name());
-#endif
+#endif*/
     /* unless told otherwise... */
     if (mca_plm_rsh_component.pass_environ_mca_params) {
         /* now check our local environment for MCA params - add them

@@ -69,11 +69,9 @@ static int orte_mig_criu_migrate(char *host, char *, pid_t);
  * Global variables
  */
 
-orte_job_t *mig_job;
-orte_process_name_t mig_orted;
 orte_mig_migration_state_t mig_state;
 
-char dump_path[25];
+char dump_path[sizeof(RESTORE_PATH_PREFIX)+10];
 
 orte_mig_base_module_t orte_mig_criu_module = {
     init,
@@ -125,7 +123,6 @@ static int orte_mig_criu_dump(pid_t fpid){
     }
         
     criu_set_images_dir_fd(dir);
-    //criu_set_shell_job(true);
 
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:criu Dumping father process", 
@@ -145,11 +142,6 @@ static int orte_mig_criu_dump(pid_t fpid){
 
 
     mig_state = MIG_MOVING;
-
-    // Inutile non arriverebbe a nessuno
-//    opal_output_verbose(0,orte_mig_base_framework.framework_output,
-//                "%s orted:mig:criu Father process dumped",
-//                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
     return ORTE_SUCCESS;
 }
@@ -201,8 +193,7 @@ static int orte_mig_criu_restore(void) {
         return ORTE_ERROR;
     }
 
-    printf("MY OLD PID IS: %i\n", getpid());
-    fflush(stdout);
+    opal_output(0,"mig:criu old PID before unshare is %i", getpid());
     unshare(CLONE_NEWPID | CLONE_NEWNS);
     int pid = fork();
     if (pid != 0) {
@@ -210,14 +201,13 @@ static int orte_mig_criu_restore(void) {
         waitpid(pid, &status, 0);
         return status;
     }
-    printf("MY NEW PID IS: %i\n", getpid());
-    fflush(stdout);
+    opal_output(0,"mig:criu new PID after unshare is %i", getpid());
 
     mount(NULL, "/proc", NULL, MS_PRIVATE | MS_REC, NULL);
     if (mount("proc", "/proc", "proc",
             MS_MGC_VAL | MS_NOSUID | MS_NOEXEC | MS_NODEV,
             NULL)) {
-        fprintf(stderr, "Can't mount proc\n");
+        opal_output(0,"mig:criu Can't mount proc!");
         return ORTE_ERROR;
     }
 
@@ -226,9 +216,7 @@ static int orte_mig_criu_restore(void) {
 
     criu_init_opts();
     if(0 > (dir = open(path, O_DIRECTORY))){
-        opal_output_verbose(0,orte_mig_base_framework.framework_output,
-                "%s orted:mig:criu Error while opening folder",
-                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        opal_output(0,"%s mig:criu Error while opening folder", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
 
@@ -240,14 +228,14 @@ static int orte_mig_criu_restore(void) {
     int status = criu_restore_child();
 
     if (status < 0 ) {
-        opal_output_verbose(0,orte_mig_base_framework.framework_output,
-                "%s orted:mig:criu Error during restore, please check criu_restore.log",
-                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        opal_output(0,"%s mig:criu Error during restore, please check criu_restore.log",
+                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
 
     if (0 > kill(pid_to_restore, SIGUSR1) ) {
-        fprintf(stderr, "Can't kill process %i\n", pid_to_restore);
+        opal_output(0,"%s mig:criu Can't signal process %i",
+                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), pid_to_restore);
         return ORTE_ERROR;
     }
 

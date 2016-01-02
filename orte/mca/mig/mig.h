@@ -60,7 +60,7 @@ typedef int (*orte_mig_base_module_finalize_fn_t)(void);
 /*
  *  Returns the module name
  */
-typedef char *(*orte_mig_base_module_get_name_fn_t)(void);
+typedef int (*orte_mig_base_module_get_name_fn_t)(void);
 
 /*
  *  Returns the module state

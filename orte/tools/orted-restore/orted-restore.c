@@ -67,18 +67,21 @@ int main(int argc, char *argv[])
 
     }
 
-    fprintf(stdout, "[%s] orted-restore: inizialized.\n", hostname);
+    int fd_output = opal_output_open(NULL);
+    opal_output_set_verbosity(fd_output , 100);
+
+    opal_output(0, "orted-restore: inizialized.");
 
     fflush(stdout); // Avoid double print during fork
 
     orte_mig_base_select();
 
     if (OPAL_SUCCESS != orte_mig_base.active_module->restore() ) {
-        fprintf(stderr, "[%s] orted-restore: failed to restore.\n", hostname);
+        opal_output(0, "orted-restore: failed to restore.");
         exit(1);
     }
 
-    fprintf(stdout, "[%s] orted-restore: success.\n", hostname);
+    opal_output(0, "orted-restore: success.");
 
     return 0;
 }

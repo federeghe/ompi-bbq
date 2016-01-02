@@ -34,50 +34,45 @@
 #endif
 #include <fcntl.h>
 
-#include "orte/mca/state/state.h"
-#include "orte/mca/errmgr/errmgr.h"
-#include "orte/runtime/orte_globals.h"
-#include "orte/util/name_fns.h"
-#include "orte/mca/rmaps/base/base.h"
 #include "orte/runtime/orte_globals.h"
 #include "orte/mca/plm/plm.h"
-#include "orte/mca/plm/plm_types.h"
-#include "orte/mca/plm/base/plm_private.h"
 
 #include "orte/mca/mig/base/base.h"
 #include "orte/mca/mig/mig_types.h"
-
-#include "orte/mca/ras/bbq/bbq_ompi_types.h"
-#include "orte/mca/ras/ras.h"
 #include "orte/mca/ras/base/base.h"
 #include "orte/mca/ras/ras.h"
 
 #include "orte/mca/oob/tcp/oob_tcp.h"
 
-
+// The listening port for migration
 #define PORT_MIGRATION_COPY 2693
 
-char mig_src[256];
-char mig_dest[256];
-orte_job_t *mig_job;
-orte_mig_migration_info_t* mig_info=NULL;
+// The interval between two try to connect to the destination host.
+// The first attempt to connect should be successful, but it may
+// happens that the ssh session on remote host should be delayed.
+#define RETRY_TIMEOUT 50000
 
+orte_mig_migration_info_t* mig_info=NULL;
 
 int orte_mig_base_prepare_migration(orte_job_t *jdata,
                                 char *src_name,
                                 char *dest_name){
-    /* Save migration data locally */
 
+    if (mig_info != NULL) { // There was a previous migration, let's free the resources
+        free(mig_info->dst_host);
+        free(mig_info);
+        mig_info = NULL;
+    }
+
+    /* Save migration data locally */
     mig_info = malloc(sizeof(orte_mig_migration_info_t));
-    strcpy(mig_src, src_name);
-    strcpy(mig_dest, dest_name);
-    mig_job = jdata;
-    
+    mig_info->dst_host = strdup(dest_name);
+
     // Search the source node in the pool, so we can get the info of orted.
     int i=0;
     orte_node_t* node;
     while ((node = opal_pointer_array_get_item(orte_node_pool, i)) != NULL) {
-            if (strcmp(node->name, mig_src) == 0)
+            if (strcmp(node->name, src_name) == 0)
                     break;
             i++;
     }
@@ -91,11 +86,10 @@ int orte_mig_base_prepare_migration(orte_job_t *jdata,
 
     opal_output_verbose(0, orte_mig_base_framework.framework_output,
                     "%s mig:base: Preparing for migration from %s to %s, sending mig_event...",
-                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), mig_src, mig_dest);
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), src_name, mig_info->dst_host);
 
     
     mig_info->src_name = node->daemon->name;
-    mig_info->dst_host = mig_dest;
 
     orte_plm.mig_event(ORTE_MIG_PREPARE, mig_info);
 
@@ -109,7 +103,7 @@ int orte_mig_base_fwd_info(int flag){
     switch(flag){
         case ORTE_MIG_PREPARE_ACK_FLAG:
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_READY);
-            orte_plm.mig_restore(mig_dest, &(mig_info->src_name));
+            orte_plm.mig_restore(mig_info->dst_host, &(mig_info->src_name));
             orte_plm.mig_event(ORTE_MIG_EXEC, mig_info);
             break;
         case ORTE_MIG_READY_FLAG:
@@ -122,15 +116,19 @@ int orte_mig_base_fwd_info(int flag){
         break;
         default:
             opal_output_verbose(0, orte_mig_base_framework.framework_output,
-                "%s mig:criu: Unknown message to forward.",
+                "%s mig:base: Unknown message to forward.",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     }
     return ORTE_SUCCESS;
 }
 
+/**
+ * This function is called by the migrating orted child, when it's ready to pass
+ * the image of checkpoint to the destination.
+ */
 int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
     opal_output_verbose(0, orte_mig_base_framework.framework_output,
-                "%s orted:mig:criu copying directory %s.",
+                "%s orted:mig:base copying directory %s.",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), path);
 
 
@@ -139,20 +137,20 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
     TAR *tar;
     
     /* Open socket towards destination node to send dump directory */
-    
     if(0 > (socket_fd = socket(AF_INET,SOCK_STREAM,0)))
     {
         opal_output_verbose(0, orte_mig_base_framework.framework_output,
-                    "%s orted:mig:criu Cannot create socket.",
+                    "%s orted:mig:base Cannot create socket.",
                     ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
     
+    // Ok, let's remove the 'user@' from the hostname
     const char* cleaned_host = strchr(host, '@');
     cleaned_host = cleaned_host == NULL ? host : cleaned_host+1;
 
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
-                "%s orted:mig:criu Connecting to destination %s...",
+                "%s orted:mig:base Connecting to destination %s...",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), cleaned_host);
     
     bzero(&addr, sizeof(addr));
@@ -163,17 +161,20 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
     while(0>connect(socket_fd,(struct sockaddr *)&addr, sizeof(addr)))
     {
         opal_output_verbose(0, orte_mig_base_framework.framework_output,
-                    "%s orted:mig:criu Can't connect to destination node. Retrying in 100ms",
+                    "%s orted:mig:base Can't connect to destination node. Retrying...",
                     ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-        usleep(100000);
+        usleep(RETRY_TIMEOUT);
+        // TODO: Implement max attempts
     }
 
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
-                "%s orted:mig:criu Connected to destination node. Compressing folder...",
+                "%s orted:mig:base Connected to destination node. Compressing folder...",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
+    // First of all send the pid of the process to restore
     write(socket_fd, (char *)&pid_to_restore,sizeof(pid_t));
 
+    // Then send the image as tar archive.
     tar_fdopen(&tar, socket_fd, NULL, NULL, O_WRONLY, 0644, 0);
     tar_append_tree(tar, path, ".");
     close(socket_fd);
@@ -181,12 +182,14 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
     return ORTE_SUCCESS;
 }
 
+/**
+ * This method is called onto the destination node by orted-restore.
+ * It receives the tar from the source node and extract all the files into
+ * the directory passed to parameters.
+ */
 int orte_mig_base_restore(char *path) {
-
-    // FIXME: Nobody can see opal_output_verbose
-
     opal_output_verbose(0, orte_mig_base_framework.framework_output,
-                "%s orted:mig:criu waiting, I will write to directory %s.",
+                "%s orted:mig:base waiting, I will write to directory %s.",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), path);
 
     struct sockaddr_in addr, addr_cl;
@@ -195,8 +198,7 @@ int orte_mig_base_restore(char *path) {
     int pid_to_restore;
     TAR *tar;
 
-    /* Open socket towards destination node to recv dump directory */
-
+    /* Open socket towards source node to recv dump directory */
     if(0 > (socket_fd = socket(AF_INET,SOCK_STREAM,0)))
     {
         opal_output_verbose(0, orte_mig_base_framework.framework_output,
@@ -207,7 +209,7 @@ int orte_mig_base_restore(char *path) {
 
     bzero(&addr, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);   // Maybe in future we can restrict to source node
     addr.sin_port = htons(PORT_MIGRATION_COPY);
     
     if(0>bind(socket_fd,(struct sockaddr *)&addr, sizeof(addr)))
@@ -224,15 +226,19 @@ int orte_mig_base_restore(char *path) {
     socket_cl = accept(socket_fd, (struct sockaddr *) &addr_cl, &size_addr_cl); // Wait until client arrives
 
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
-                "%s orted:mig:criu Accepted source node",
+                "%s orted:mig:base Accepted source node",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
+    // First of all we receive the pid number of the parent process
+    // to restore
     read(socket_cl, (char *)&pid_to_restore,sizeof(pid_t));
 
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
-                "%s orted:mig:criu Decompressing folder...",
+                "%s orted:mig:base Decompressing folder...",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
+    // FIXME: tar does not handle socket recv correctly, it may happen
+    // that the receive fails.
     tar_fdopen(&tar, socket_cl, NULL, NULL, O_RDONLY, 0644, 0);
     tar_extract_all(tar, path);
     tar_close(tar);
