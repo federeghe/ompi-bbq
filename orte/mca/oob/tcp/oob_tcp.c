@@ -70,9 +70,6 @@
 #include "orte/mca/oob/tcp/oob_tcp_connection.h"
 #include "orte/mca/oob/tcp/oob_tcp_ping.h"
 
-#include "orte/mca/mig/mig_types.h"
-
-
 static void tcp_init(void);
 static void tcp_fini(void);
 static void accept_connection(const int accepted_fd,
@@ -86,9 +83,12 @@ static void resend(struct mca_oob_tcp_msg_error_t *mop);
 static void ft_event(int state);
 
 #if ORTE_ENABLE_MIGRATION
-	static void mig_event(int event, void* data);
-	static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest, const int port);
-	static void mig_me(bool defreezing);
+
+#include "orte/mca/mig/mig_types.h"
+
+static void mig_event(int event, void* data);
+static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest, const int port);
+static void mig_me(bool defreezing);
 #endif
 
 mca_oob_tcp_module_t mca_oob_tcp_module = {

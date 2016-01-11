@@ -39,8 +39,10 @@
 #include "orte/util/show_help.h"
 #include "orte/mca/ess/base/base.h"
 #include "orte/mca/ess/ess.h"
+#if ORTE_ENABLE_MIGRATION
 #include "orte/mca/mig/base/base.h"
 #include "orte/mca/mig/mig.h"
+#endif
 #include "orte/mca/errmgr/errmgr.h"
 #include "orte/util/proc_info.h"
 #include "orte/util/error_strings.h"
@@ -136,7 +138,9 @@ int orte_init(int* pargc, char*** pargv, orte_proc_type_t flags)
         error = "orte_ess_base_select";
         goto error;
     }
-    
+
+#if ORTE_ENABLE_MIGRATION
+
     /* Open MIG and select the correct module*/
     if (ORTE_SUCCESS != (ret = mca_base_framework_open(&orte_mig_base_framework, 0))) {
         ORTE_ERROR_LOG(ret);
@@ -154,7 +158,7 @@ int orte_init(int* pargc, char*** pargv, orte_proc_type_t flags)
         goto error;
     }
     
-    
+#endif
 
     if (!ORTE_PROC_IS_APP) {
         /* ORTE tools "block" in their own loop over the event

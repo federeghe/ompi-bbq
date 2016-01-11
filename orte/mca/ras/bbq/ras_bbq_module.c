@@ -40,9 +40,6 @@
 #include "ras_bbq.h"
 #include "bbq_ompi_types.h"
 
-#include "orte/mca/mig/mig.h"
-#include "orte/mca/mig/base/base.h"
-
 
 static int init(void);
 static int recv_data(int fd, short args, void *cbdata);
@@ -54,9 +51,14 @@ static int recv_cmd(void);
 static int send_cmd_node_request(void);
 static int send_cmd_terminate(void);
 
+#if ORTE_ENABLE_MIGRATION
+#include "orte/mca/mig/mig.h"
+#include "orte/mca/mig/base/base.h"
+
 /* MIG-related functions */
 static int migrate(void);
 static int send_mig_info(uint8_t state);
+#endif
 
 /*
  * Global variable
@@ -168,11 +170,19 @@ static int recv_data(int fd, short args, void *cbdata)
             }
     	    break;
         case BBQ_CMD_MIGRATE:
+#if ORTE_ENABLE_MIGRATION
             /* We are receiving migration info from BBQ... */
             if(migrate())
             {
                 return ORTE_ERROR;
             }
+#else
+            opal_output_verbose(0, orte_ras_base_framework.framework_output,
+                "%s ras:bbq:error: received migrationg request, but mig module is not present.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            return ORTE_ERROR;
+#endif
+
             break;
         default:
             opal_output_verbose(0, orte_ras_base_framework.framework_output,
@@ -329,10 +339,11 @@ static int send_cmd_node_request(void)
     int i;
     
     command.flags = 0;
+#if ORTE_ENABLE_MIGRATION
     if(NULL != orte_mig_base.active_module && orte_mig_base.active_module->get_state() == MIG_AVAILABLE){
         command.flags |= BBQ_OPT_MIG_AVAILABLE;
     }
-    
+#endif
     command.cmd_type = BBQ_CMD_NODES_REQUEST;
     command.jobid = received_job->jobid;
     
@@ -400,6 +411,7 @@ static int send_cmd_terminate(void)
     return ORTE_SUCCESS;
 }
 
+#if ORTE_ENABLE_MIGRATION
 static int migrate(void){
     int bytes;
     local_bbq_migrate_t info;
@@ -472,3 +484,4 @@ static int send_mig_info(uint8_t state){
     
     return ORTE_SUCCESS;
 }
+#endif

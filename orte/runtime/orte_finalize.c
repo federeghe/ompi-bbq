@@ -30,8 +30,10 @@
 
 #include "orte/mca/ess/ess.h"
 #include "orte/mca/ess/base/base.h"
+#if ORTE_ENABLE_MIGRATION
 #include "orte/mca/mig/mig.h"
 #include "orte/mca/mig/base/base.h"
+#endif
 #include "orte/runtime/orte_globals.h"
 #include "orte/runtime/runtime.h"
 #include "orte/runtime/orte_locks.h"
@@ -71,12 +73,15 @@ int orte_finalize(void)
     /* close the ess itself */
     (void) mca_base_framework_close(&orte_ess_base_framework);
 
+#if ORTE_ENABLE_MIGRATION
+
     /* Finalize MIG module*/
     if (NULL != orte_mig_base.active_module && ORTE_SUCCESS != (rc = orte_mig_base.active_module->finalize())){
         return rc;
     }
     /* close MIG framework */
     (void) mca_base_framework_close(&orte_mig_base_framework);
+#endif
     
     /* cleanup the process info */
     orte_proc_info_finalize();

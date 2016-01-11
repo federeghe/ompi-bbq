@@ -83,7 +83,7 @@
 
 #include "orte/orted/orted.h"
 
-#ifdef ORTE_ENABLE_MIGRATION
+#if ORTE_ENABLE_MIGRATION
 #include "orte/mca/mig/mig_types.h"
 #include "orte/mca/mig/base/base.h"
 
