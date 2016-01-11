@@ -177,8 +177,15 @@ static void gen_random(char *s, const int len) {
     s[len] = '\0';
 }
 
+static void sig_child_handler(int s) {
+    if (s != SIGCLD)
+        return; // what's happened here??
+    opal_output(0,"mig:criu sig cld received.");
+    exit(0);    // All ok, bye bye
+}
 
 static int orte_mig_criu_restore(void) {
+
     // Generate a random string for the directory
     srand(time(NULL));
     int prefix_len = strlen(RESTORE_PATH_PREFIX);
@@ -211,7 +218,6 @@ static int orte_mig_criu_restore(void) {
         return ORTE_ERROR;
     }
 
-
     int dir;
 
     criu_init_opts();
@@ -225,13 +231,16 @@ static int orte_mig_criu_restore(void) {
     criu_set_log_level(4);
 
 
-    int status = criu_restore_child();
+    int status = criu_restore();
 
     if (status < 0 ) {
         opal_output(0,"%s mig:criu Error during restore, please check criu_restore.log",
                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         return ORTE_ERROR;
     }
+
+    signal(SIGCLD, sig_child_handler);
+
 
     if (0 > kill(pid_to_restore, SIGUSR1) ) {
         opal_output(0,"%s mig:criu Can't signal process %i",

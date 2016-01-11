@@ -60,12 +60,12 @@ typedef int (*orte_mig_base_module_finalize_fn_t)(void);
 /*
  *  Returns the module name
  */
-typedef int (*orte_mig_base_module_get_name_fn_t)(void);
+typedef char * (*orte_mig_base_module_get_name_fn_t)(void);
 
 /*
  *  Returns the module state
  */
-typedef char *(*orte_mig_base_module_get_state_fn_t)(void);
+typedef orte_mig_migration_state_t(*orte_mig_base_module_get_state_fn_t)(void);
 
 /**
  * MIG module structure

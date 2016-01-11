@@ -65,8 +65,11 @@ orte_ras_base_module_t orte_ras_bbq_module = {
     init,
     orte_ras_bbq_allocate,
     NULL,
+    finalize,
+#if ORTE_ENABLE_MIGRATION
     send_mig_info,
-    finalize
+#endif
+
 };
 
 static int cmd_received;

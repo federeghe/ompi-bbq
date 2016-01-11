@@ -103,10 +103,11 @@ static int rsh_launch(orte_job_t *jdata);
 static int remote_spawn(opal_buffer_t *launch);
 static int rsh_terminate_orteds(void);
 static int rsh_finalize(void);
-static int rsh_mig_event(int event, void *data);
 
 #if ORTE_ENABLE_MIGRATION
 #include "orte/mca/mig/base/base.h"
+
+static int rsh_mig_event(int event, void *data);
 static int rsh_checkpoint(const orte_process_name_t* proc);
 static int rsh_restore(const char *new_hostname, const orte_process_name_t* proc);
 
@@ -123,12 +124,12 @@ orte_plm_base_module_t orte_plm_rsh_module = {
     rsh_terminate_orteds,
     orte_plm_base_orted_kill_local_procs,
     orte_plm_base_orted_signal_local_procs,
+    rsh_finalize,
 #if ORTE_ENABLE_MIGRATION
     rsh_mig_event,
     rsh_checkpoint,
     rsh_restore,
 #endif
-    rsh_finalize
 };
 
 typedef struct {
@@ -288,6 +289,7 @@ static void rsh_wait_daemon(pid_t pid, int status, void* cbdata)
         return;
     }
 
+#if ORTE_ENABLE_MIGRATION
     if(daemon_mig_name != NULL && daemon->name.vpid == daemon_mig_name->vpid) {
         OPAL_OUTPUT_VERBOSE((1, orte_plm_base_framework.framework_output,
                              "%s daemon %s exit with status %d (checkpointed!)",
@@ -299,6 +301,7 @@ static void rsh_wait_daemon(pid_t pid, int status, void* cbdata)
         OBJ_RELEASE(caddy);
         return;
     }
+#endif
 
     if (! WIFEXITED(status) || ! WEXITSTATUS(status) == 0) { /* if abnormal exit */
         /* if we are not the HNP, send a message to the HNP alerting it

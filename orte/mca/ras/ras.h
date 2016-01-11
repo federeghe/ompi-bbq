@@ -107,12 +107,12 @@ struct orte_ras_base_module_2_0_0_t {
     /** Allocation function pointer */
     orte_ras_base_module_allocate_fn_t      allocate;
     orte_ras_base_module_dealloc_fn_t       deallocate;
-    
+    /** Finalization function pointer */
+    orte_ras_base_module_finalize_fn_t      finalize;
+
 #if ORTE_ENABLE_MIGRATION
     orte_ras_base_module_send_mig_info_fn_t send_mig_info;
 #endif
-    /** Finalization function pointer */
-    orte_ras_base_module_finalize_fn_t      finalize;
 };
 /** Convenience typedef */
 typedef struct orte_ras_base_module_2_0_0_t orte_ras_base_module_2_0_0_t;

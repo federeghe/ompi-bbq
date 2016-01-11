@@ -54,11 +54,14 @@
 
 orte_mig_migration_info_t* mig_info=NULL;
 
+static void change_hnp_internal_references(void);
+
 int orte_mig_base_prepare_migration(orte_job_t *jdata,
                                 char *src_name,
                                 char *dest_name){
 
     if (mig_info != NULL) { // There was a previous migration, let's free the resources
+        free(mig_info->src_host);
         free(mig_info->dst_host);
         free(mig_info);
         mig_info = NULL;
@@ -66,6 +69,7 @@ int orte_mig_base_prepare_migration(orte_job_t *jdata,
 
     /* Save migration data locally */
     mig_info = malloc(sizeof(orte_mig_migration_info_t));
+    mig_info->src_host = strdup(src_name);
     mig_info->dst_host = strdup(dest_name);
 
     // Search the source node in the pool, so we can get the info of orted.
@@ -113,6 +117,7 @@ int orte_mig_base_fwd_info(int flag){
         case ORTE_MIG_DONE_FLAG:
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_DONE);
             orte_oob_base_mig_event(ORTE_MIG_DONE, (void*)(mig_info->dst_host));
+            change_hnp_internal_references();
         break;
         default:
             opal_output_verbose(0, orte_mig_base_framework.framework_output,
@@ -121,6 +126,22 @@ int orte_mig_base_fwd_info(int flag){
     }
     return ORTE_SUCCESS;
 }
+
+static void change_hnp_internal_references(void) {
+    int i;
+    orte_node_t *node;
+    for (i=0; i < orte_node_pool->size; i++) {
+        if (NULL == (node = (orte_node_t*)opal_pointer_array_get_item(orte_node_pool, i))) {
+            continue;
+        }
+        if (0 == strcmp(mig_info->src_host, node->name)) {
+            node->name = strdup(mig_info->dst_host);
+            break;
+        }
+    }
+
+}
+
 
 /**
  * This function is called by the migrating orted child, when it's ready to pass

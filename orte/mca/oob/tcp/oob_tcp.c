@@ -221,7 +221,7 @@ static void accept_connection(const int accepted_fd,
                         opal_net_get_hostname(addr),
                         opal_net_get_port(addr));
 
-#ifdef ORTE_ENABLE_MIGRATION
+#if ORTE_ENABLE_MIGRATION
     if (mca_oob_tcp_migrating_peer != NULL) {
         mig_done(mca_oob_tcp_migrating_peer, opal_net_get_hostname(addr),opal_net_get_port(addr) );
     }
@@ -612,7 +612,7 @@ static void recv_handler(int sd, short flg, void *cbdata)
     mca_oob_tcp_hdr_t hdr;
     mca_oob_tcp_peer_t *peer=NULL;
 
-#ifdef ORTE_ENABLE_MIGRATION
+#if ORTE_ENABLE_MIGRATION
     peer = mca_oob_tcp_migrating_peer;
     if (peer != NULL) {
         peer->state = MCA_OOB_TCP_CONNECT_ACK;

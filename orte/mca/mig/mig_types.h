@@ -38,6 +38,7 @@ typedef enum{
 
 typedef struct orte_mig_migration_info_t {
     orte_process_name_t src_name;
+    char* src_host;
     char* dst_host;
 } orte_mig_migration_info_t;
 

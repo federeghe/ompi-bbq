@@ -625,6 +625,12 @@ void mca_oob_tcp_recv_handler(int sd, short flags, void *cbdata)
             }
         }
         break;
+#if ORTE_ENABLE_MIGRATION
+    case MCA_OOB_TCP_FREEZED:
+        /* turn off the recv event */
+        opal_event_del(&peer->recv_event);
+    break;
+#endif
     default: 
         opal_output(0, "%s-%s mca_oob_tcp_peer_recv_handler: invalid socket state(%d)", 
                     ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),

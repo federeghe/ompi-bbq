@@ -56,13 +56,12 @@ orte_plm_base_module_t orte_plm = {
     NULL,   /* cannot terminate orteds from a proxy */
     NULL,   /* cannot terminate procs from a proxy */
     NULL,   /* cannot signal job from a proxy */
+    orte_plm_proxy_finalize,
 #if ORTE_ENABLE_MIGRATION
-
     NULL,
     NULL,
     NULL,
 #endif
-    orte_plm_proxy_finalize
 };
 
 

@@ -63,7 +63,6 @@
 #endif
 
 static bool recv_issued=false;
-static int ack_count = 0;
 
 int orte_plm_base_comm_start(void)
 {
@@ -145,6 +144,10 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
     uint8_t flag;
     int i;
     char **env;
+
+#if ORTE_ENABLE_MIGRATION
+    static int ack_count = 0;
+#endif
 
     OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
                          "%s plm:base:receive processing msg",

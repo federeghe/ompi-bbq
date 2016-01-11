@@ -119,14 +119,13 @@ struct orte_plm_base_module_1_0_0_t {
     orte_plm_base_module_terminate_orteds_fn_t   terminate_orteds;
     orte_plm_base_module_terminate_procs_fn_t    terminate_procs;
     orte_plm_base_module_signal_job_fn_t         signal_job;
+    orte_plm_base_module_finalize_fn_t           finalize;
 
 #if ORTE_ENABLE_MIGRATION
     orte_plm_base_module_mig_event_fn_t          mig_event;
     orte_plm_base_module_mig_checkpoint_fn_t     mig_checkpoint;
     orte_plm_base_module_mig_restore_fn_t        mig_restore;
 #endif
-
-    orte_plm_base_module_finalize_fn_t           finalize;
 };
 
 /** shorten orte_plm_base_module_1_0_0_t declaration */

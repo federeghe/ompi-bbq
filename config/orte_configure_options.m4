@@ -133,5 +133,6 @@ AC_DEFINE_UNQUOTED([ORTE_ENABLE_MIGRATION],
                    [$orte_want_migration],
                    [Whether we want migration enabled])
 
+AM_CONDITIONAL(ORTE_ENABLE_MIGRATION, test "$orte_want_migration" = "yes")
 
 ])dnl

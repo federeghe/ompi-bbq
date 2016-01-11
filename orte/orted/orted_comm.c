@@ -133,7 +133,9 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     orte_std_cntr_t num_procs, num_new_procs = 0, p;
     orte_proc_t *cur_proc = NULL, *prev_proc = NULL;
     bool found = false;
+#if ORTE_ENABLE_MIGRATION
     uint8_t flag;
+#endif
 
     /* unpack the command */
     n = 1;
@@ -1106,7 +1108,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         }
         break;
 
-#ifdef ORTE_ENABLE_MIGRATION
+#if ORTE_ENABLE_MIGRATION
 
 #define SEND_MIG_ACK(ack_type)  do {          \
         answer = OBJ_NEW(opal_buffer_t);  \
@@ -1316,14 +1318,15 @@ static char *get_orted_comm_cmd_str(int command)
 
     case ORTE_DAEMON_ABORT_PROCS_CALLED:
         return strdup("ORTE_DAEMON_ABORT_PROCS_CALLED");
-        
+
+#if ORTE_ENABLE_MIGRATION
     case ORTE_DAEMON_MIG_PREPARE:
         return strdup("ORTE_DAEMON_MIG_PREPARE");
     case ORTE_DAEMON_MIG_EXEC:
         return strdup("ORTE_DAEMON_MIG_EXEC");
     case ORTE_DAEMON_MIG_DONE:
         return strdup("ORTE_DAEMON_MIG_DONE");
-
+#endif
 
         
     default:
