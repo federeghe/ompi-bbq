@@ -6,6 +6,8 @@
 # $HEADER$
 #
 
+if ORTE_ENABLE_MIGRATION
+
 AM_CPPFLAGS = $(mig_criu_CPPFLAGS)
 
 dist_ompidata_DATA = help-mig-criu.txt
@@ -46,3 +48,5 @@ libmca_mig_criu_la_SOURCES = $(lib_sources)
 libmca_mig_criu_la_LDFLAGS = -module -avoid-version $(mig_criu_LDFLAGS)
 libmca_mig_criu_la_LIBADD = $(mig_criu_LIBS)
 libmca_mig_criu_la_CPPFLAGS = $(mig_criu_CPPFLAGS)
+
+endif

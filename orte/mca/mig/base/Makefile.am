@@ -5,6 +5,8 @@
 # $HEADER$
 #
 
+if ORTE_ENABLE_MIGRATION
+
 dist_ompidata_DATA += base/help-mig-base.txt
 
 headers += \
@@ -16,3 +18,5 @@ libmca_mig_la_SOURCES += \
 	base/mig_base.c
 
 libmca_mig_la_LIBADD = -ltar
+
+endif
