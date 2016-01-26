@@ -535,30 +535,35 @@ set_uniq_paths_for_init_rndv(mca_btl_sm_component_t *comp_ptr)
     comp_ptr->sm_rndv_file_name = NULL;
 
     if (asprintf(&comp_ptr->sm_mpool_ctl_file_name,
-                 "%s"OPAL_PATH_SEP"shared_mem_pool.%s",
+                 "%s"OPAL_PATH_SEP"shared_mem_pool.%s.%i",
                  ompi_process_info.job_session_dir,
-                 ompi_process_info.nodename) < 0) {
+                 ompi_process_info.nodename,
+                 ompi_process_info.my_daemon.vpid) < 0) {
+
         /* rc set */
         goto out;
     }
     if (asprintf(&comp_ptr->sm_mpool_rndv_file_name,
-                 "%s"OPAL_PATH_SEP"shared_mem_pool_rndv.%s",
+                 "%s"OPAL_PATH_SEP"shared_mem_pool_rndv.%s.%i",
                  ompi_process_info.job_session_dir,
-                 ompi_process_info.nodename) < 0) {
+                 ompi_process_info.nodename,
+                 ompi_process_info.my_daemon.vpid) < 0) {
         /* rc set */
         goto out;
     }
     if (asprintf(&comp_ptr->sm_ctl_file_name,
-                 "%s"OPAL_PATH_SEP"shared_mem_btl_module.%s",
+                 "%s"OPAL_PATH_SEP"shared_mem_btl_module.%s.%i",
                  ompi_process_info.job_session_dir,
-                 ompi_process_info.nodename) < 0) {
+                 ompi_process_info.nodename,
+                 ompi_process_info.my_daemon.vpid) < 0) {
         /* rc set */
         goto out;
     }
     if (asprintf(&comp_ptr->sm_rndv_file_name,
-                 "%s"OPAL_PATH_SEP"shared_mem_btl_rndv.%s",
+                 "%s"OPAL_PATH_SEP"shared_mem_btl_rndv.%s.%i",
                  ompi_process_info.job_session_dir,
-                 ompi_process_info.nodename) < 0) {
+                 ompi_process_info.nodename,
+                 ompi_process_info.my_daemon.vpid) < 0) {
         /* rc set */
         goto out;
     }

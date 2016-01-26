@@ -77,7 +77,7 @@ orte_ras_base_module_t orte_ras_bbq_module = {
 static int cmd_received;
 static int socket_fd;
 static opal_event_t recv_ev;
-static orte_job_t *received_job;
+static orte_job_t *received_job=NULL;
 static opal_list_t nodes;
 
 static int init(void){
@@ -219,8 +219,9 @@ static int finalize(void)
     
     opal_event_del(&recv_ev);
     
-    OBJ_DESTRUCT(received_job);
-    
+    if (received_job != NULL) {
+        OBJ_DESTRUCT(received_job);
+    }
     shutdown(socket_fd, 2);
     close(socket_fd);
     
@@ -416,6 +417,9 @@ static int migrate(void){
     int bytes;
     local_bbq_migrate_t info;
     
+    printf("HELLO");
+    fflush(stdout);
+
     bytes=read(socket_fd,&info,sizeof(local_bbq_migrate_t));
     if(bytes!=sizeof(local_bbq_migrate_t))
     {   

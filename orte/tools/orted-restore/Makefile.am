@@ -18,7 +18,7 @@
 # $HEADER$
 #
 
-if ORTE_ENABLE_MIGRATION
+#if ORTE_ENABLE_MIGRATION
 
 include $(top_srcdir)/Makefile.man-page-rules
 
@@ -41,6 +41,6 @@ endif # OMPI_INSTALL_BINARIES
 orted_restore_SOURCES = orted-restore.c
 orted_restore_LDADD = $(top_builddir)/orte/libopen-rte.la $(top_builddir)/opal/libopen-pal.la
 
-endif
+#endif
 distclean-local:
 	rm -f $(man_pages)

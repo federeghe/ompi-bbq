@@ -6,7 +6,7 @@
 # $HEADER$
 #
 
-if ORTE_ENABLE_MIGRATION
+#if ORTE_ENABLE_MIGRATION
 
 # main library setup
 noinst_LTLIBRARIES = libmca_mig.la
@@ -26,7 +26,7 @@ nobase_orte_HEADERS = $(headers)
 endif
 
 include base/Makefile.am
-endif 
+#endif 
 
 distclean-local:
 	rm -f base/static-components.h

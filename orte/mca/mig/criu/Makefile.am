@@ -6,7 +6,7 @@
 # $HEADER$
 #
 
-if ORTE_ENABLE_MIGRATION
+#if ORTE_ENABLE_MIGRATION
 
 AM_CPPFLAGS = $(mig_criu_CPPFLAGS)
 
@@ -49,4 +49,4 @@ libmca_mig_criu_la_LDFLAGS = -module -avoid-version $(mig_criu_LDFLAGS)
 libmca_mig_criu_la_LIBADD = $(mig_criu_LIBS)
 libmca_mig_criu_la_CPPFLAGS = $(mig_criu_CPPFLAGS)
 
-endif
+#endif
