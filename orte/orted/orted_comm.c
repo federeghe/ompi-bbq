@@ -89,13 +89,16 @@
 
 #include "orte/mca/oob/base/base.h"
 
-char* mig_dest_host;
-orte_process_name_t mig_src_p;
 int mig_status;
+char* mig_dest_host;
+sighandler_t prev_handler;
+orte_process_name_t mig_src_p;
 
 void orted_mig_callback(int status, orte_process_name_t *peer,
                             opal_buffer_t* buffer, orte_rml_tag_t tag,
                             void* cbdata);
+
+static void orted_mig_child_ack_sig(int signal);
 
 #endif
 
@@ -1156,12 +1159,27 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         }
 
         mig_status = ORTE_DAEMON_MIG_PREPARE;   // Abuse of constant
-        // TODO: btl
 
-        
-        // Send the ack back
+        /* Create the file with source/destination to be readed by my children */
+        char filename[30];
+        sprintf(filename,"/tmp/orted_mig_nodes_%i", getpid());
+        FILE *f = fopen(filename,"w");
+        fprintf(f, "%u,%u,%s",mig_src_p.jobid,mig_src_p.vpid,mig_dest_host);
+        fclose(f);
+
+        prev_handler = signal(SIGUSR1, orted_mig_child_ack_sig);
+
+        /* Now I send the signal to all children to let them know that
+         * they must read the file.
+         */
+        /*for (;;;) {
+
+        }*/
+
+        // Remove me:
         SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
-        
+
+
         break;
     case ORTE_DAEMON_MIG_EXEC:
         opal_output(0, "%s orted: command ORTE_DAEMON_MIG_EXEC received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
@@ -1188,17 +1206,12 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
 #if ORTE_ENABLE_MIGRATION
 
-sighandler_t prev_handler;
-
 // Called by orted-restore signal when we are restoring
 static void orted_mig_restore_sig(int sig) {
     if (OPAL_UNLIKELY(sig != SIGUSR1)) {
         // ???
         return;
     }
-
-    fprintf(stdout, "Signal handler called.\n");
-    fflush(stdout);
 
     // Restore the original signal handler for USR1
     signal(SIGUSR1, prev_handler);
@@ -1216,9 +1229,34 @@ static void orted_mig_restore_sig(int sig) {
 
     // Ehy HNP, I'm alive!
     SEND_MIG_ACK(ORTE_MIG_DONE_FLAG);
+}
 
-    fprintf(stdout, "Signal handler end.\n");
-    fflush(stdout);
+static void orted_mig_child_ack_sig(int sig) {
+    if (OPAL_UNLIKELY(sig != SIGUSR1)) {
+        // ???
+        return;
+    }
+
+    // We have to wait that all children report
+    // that are ready for migration via SIGUSR1
+
+    static unsigned int received=0;
+    if (++received == orte_process_info.num_procs) {
+
+        // Restore the original signal handler for USR1
+        signal(SIGUSR1, prev_handler);
+
+        // Declare some variables to send the ack flag
+        orte_daemon_cmd_flag_t command;
+        int ret;
+        opal_buffer_t *answer;
+        uint8_t flag;
+
+        SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
+    }
+
+    opal_output(0, "%s orted: received ack from a child.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
 
 }
 

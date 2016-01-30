@@ -223,18 +223,25 @@ static int orte_mig_criu_restore(void) {
 
     opal_output(0,"mig:criu new PID after unshare is %i", getpid());
 
-    mount(NULL, "/proc", NULL, MS_PRIVATE | MS_REC, NULL);
-    if (mount("proc", "/proc", "proc",
-            MS_MGC_VAL | MS_NOSUID | MS_NOEXEC | MS_NODEV,
-            NULL)) {
-        opal_output(0,"mig:criu Can't mount proc!");
+
+    if (mount("none", "/proc", NULL, MS_PRIVATE|MS_REC, NULL)) {
+        opal_output(0,"mig:criu Can't umount proc! errno=%i", errno);
         exit(ORTE_ERROR);
     }
 
-    umount("/dev/pts");
-    int error;
-    if ((error = mount("devpts", "/dev/pts", "devpts", MS_MGC_VAL | MS_NOSUID | MS_NOEXEC | MS_NODEV, NULL) )) {
-        opal_output(0,"mig:criu Can't mount pts! %i", errno);
+    if (mount("proc", "/proc", "proc", MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL)) {
+        opal_output(0,"mig:criu Can't mount proc! errno=%i", errno);
+        exit(ORTE_ERROR);
+    }
+
+
+    if (mount("devpts", "/dev/pts", "devpts", MS_MGC_VAL | MS_NOSUID | MS_NOEXEC, "newinstance") ) {
+        opal_output(0,"mig:criu Can't mount pts! errno=%i", errno);
+        exit(ORTE_ERROR);
+    }
+
+    if (mount("/dev/pts/ptmx", "/dev/ptmx", NULL, MS_MGC_VAL | MS_NOSUID | MS_NOEXEC | MS_BIND, NULL) ) {
+        opal_output(0,"mig:criu Can't mount ptmx! errno=%i", errno);
         exit(ORTE_ERROR);
     }
 
@@ -265,13 +272,16 @@ static int orte_mig_criu_restore(void) {
         exit(ORTE_ERROR);
     }
 
+    wait(NULL);
+
     // We have to wait the termination of the restored process to
     // guarantee the output will be forwarded to ssh and then to
     // hnp. The sleep time is not really important (this time is lost
     // after the termination of the process)
-    while(kill(pid_to_restore, 0) != -1) {
+/*    while(kill(pid_to_restore, 0) != -1) {
+        opal_output(0, "kill ok\n");
         sleep(1);
-    }
+    }*/
 
     exit(ORTE_SUCCESS);
 
