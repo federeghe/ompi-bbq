@@ -1172,9 +1172,9 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         /* Now I send the signal to all children to let them know that
          * they must read the file.
          */
-        /*for (;;;) {
-
-        }*/
+        if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, SIGUSR1))) {
+            ORTE_ERROR_LOG(ret);
+        }
 
         // Remove me:
         SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
