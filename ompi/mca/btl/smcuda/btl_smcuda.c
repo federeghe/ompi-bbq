@@ -103,9 +103,14 @@ mca_btl_smcuda_t mca_btl_smcuda = {
         mca_btl_smcuda_dump,
         NULL, /* mpool */
         mca_btl_smcuda_register_error_cb, /* register error */
-        mca_btl_smcuda_ft_event
+        mca_btl_smcuda_ft_event,
+        mca_btl_smcuda_mig_event
     }
 };
+
+#if ORTE_ENABLE_MIGRATION
+int mca_btl_smcuda_mig_event(int event, void *data){}
+#endif
 
 #if OPAL_CUDA_SUPPORT
 static void mca_btl_smcuda_send_cuda_ipc_request(struct mca_btl_base_module_t* btl,

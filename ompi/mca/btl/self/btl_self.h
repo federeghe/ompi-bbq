@@ -223,6 +223,15 @@ int mca_btl_self_rdma(
  */
 int mca_btl_self_ft_event(int state);
 
+#if ORTE_ENABLE_MIGRATION
+/**
+ * Migration event notification function. Called by signal mgmt routine in btl_base_frame.
+ * @param event Event type
+ * @return OMPI_SUCCESS or failure status
+ */
+extern int mca_btl_self_mig_event(int event, void *data);
+#endif
+
 END_C_DECLS
 
 #endif

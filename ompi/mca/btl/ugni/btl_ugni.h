@@ -274,6 +274,15 @@ mca_btl_ugni_put (struct mca_btl_base_module_t *btl,
 
 int mca_btl_ugni_progress_send_wait_list (struct mca_btl_base_endpoint_t *endpoint);
 
+#if ORTE_ENABLE_MIGRATION
+/**
+ * Migration event notification function. Called by signal mgmt routine in btl_base_frame.
+ * @param event Event type
+ * @return OMPI_SUCCESS or failure status
+ */
+int mca_btl_ugni_mig_event(int event, void *data);
+#endif
+
 mca_btl_base_descriptor_t *
 mca_btl_ugni_alloc(struct mca_btl_base_module_t *btl,
                    struct mca_btl_base_endpoint_t *endpoint,

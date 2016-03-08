@@ -533,6 +533,15 @@ extern void mca_btl_smcuda_dump(struct mca_btl_base_module_t* btl,
  */
 int mca_btl_smcuda_ft_event(int state);
 
+#if ORTE_ENABLE_MIGRATION
+/**
+ * Migration event notification function. Called by signal mgmt routine in btl_base_frame.
+ * @param event Event type
+ * @return OMPI_SUCCESS or failure status
+ */
+extern int mca_btl_smcuda_mig_event(int event, void *data);
+#endif
+
 #if OMPI_ENABLE_PROGRESS_THREADS == 1
 void mca_btl_smcuda_component_event_thread(opal_object_t*);
 #endif

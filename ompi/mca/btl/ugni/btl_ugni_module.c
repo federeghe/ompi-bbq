@@ -54,8 +54,12 @@ mca_btl_ugni_module_t mca_btl_ugni_module = {
         .btl_sendi       = mca_btl_ugni_sendi,
         .btl_put         = mca_btl_ugni_put,
         .btl_get         = mca_btl_ugni_get,
+        .btl_mig_event   = mca_btl_ugni_mig_event
     }
 };
+#if ORTE_ENABLE_MIGRATION
+int mca_btl_ugni_mig_event(int event, void *data);
+#endif
 
 int
 mca_btl_ugni_module_init (mca_btl_ugni_module_t *ugni_module,

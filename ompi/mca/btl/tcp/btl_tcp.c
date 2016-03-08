@@ -62,9 +62,35 @@ mca_btl_tcp_module_t mca_btl_tcp_module = {
         mca_btl_base_dump,
         NULL, /* mpool */
         NULL, /* register error */
-        mca_btl_tcp_ft_event
+        mca_btl_tcp_ft_event,
+        mca_btl_tcp_mig_event
     }
 };
+
+#if ORTE_ENABLE_MIGRATION
+char hostname[20]; //Source/destination node hostname
+bool itsme;
+
+int mca_btl_tcp_mig_event(int event, void *data){
+    switch(event){
+        case BTL_MIGRATING_START:
+            itsme = true;
+            break;
+        case BTL_NOT_MIGRATING_START:
+            itsme = false;
+            strcpy(hostname,(const char *)data);
+            break;
+        case BTL_MIGRATING_END:
+            itsme = true;
+            break;
+        case BTL_NOT_MIGRATING_END:
+            itsme = false;
+            break;
+        default:
+            return;
+    }
+}
+#endif
 
 /**
  *
@@ -366,6 +392,13 @@ int mca_btl_tcp_send( struct mca_btl_base_module_t* btl,
     mca_btl_tcp_module_t* tcp_btl = (mca_btl_tcp_module_t*) btl; 
     mca_btl_tcp_frag_t* frag = (mca_btl_tcp_frag_t*)descriptor; 
     int i;
+    
+    char hostname[30];
+    gethostname(hostname,30);
+    
+    printf("++++++++ ENDPOINT DEBUGGING:\n");
+    printf("++++++++ endpoint hostname: %s, my hostname: %s\n", endpoint->endpoint_proc->proc_ompi->proc_hostname, hostname);
+    fflush(stdout);
 
     frag->btl = tcp_btl;
     frag->endpoint = endpoint;

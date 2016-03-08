@@ -76,6 +76,78 @@ int mca_btl_base_warn_component_unused = 1;
 opal_list_t mca_btl_base_modules_initialized;
 bool mca_btl_base_thread_multiple_override = false;
 
+#if ORTE_ENABLE_MIGRATION
+
+sighandler_t prev_handler;
+
+// Orted signal to freeze btl connections
+static void orted_btl_freeze_sig(int sig) {
+    static bool migrating = false;
+    FILE *mig_info;
+    char filename[40];
+    static uint32_t src_jobid;
+    static uint32_t src_vpid;
+    static char dst[20];
+    static char src[20];
+    mca_btl_base_selected_module_t *sm, *next;
+    
+    sprintf(filename,"/tmp/orted_mig_nodes_%i",getppid());
+    
+    if (OPAL_UNLIKELY(sig != SIGUSR1)) {
+        // ???
+        return;
+    }
+    
+    
+    if(!migrating){
+        /* Migration hasn't started yet. We need to tell all endpoints to stop communicating.*/
+        if(NULL == (mig_info = fopen(filename,"r"))){
+            fprintf(stdout, "Cannot open orte_mig_nodes file, aborting...\n");
+            fflush(stdout);
+            return;
+        }
+        
+        fscanf(mig_info,"%u %u %s %s",&src_jobid,&src_vpid,src,dst);
+        
+        if(OMPI_RTE_MY_NODEID == src_vpid){
+            //I'm the one migrating, I have to close all outgoing endpoints
+            OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
+                sm->btl_module->btl_mig_event(BTL_MIGRATING_START, src); //call to BTL instances to close connections
+            }
+        }
+        else{
+            //I'm not migrating, just have to close connections towards migrating node
+            OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
+                sm->btl_module->btl_mig_event(BTL_NOT_MIGRATING_START, src); //call to BTL instances to close connections
+            }
+        }
+        migrating = true;
+    }
+    else{
+        /* Migration is already ongoing. Endpoint must restore communications towards the new node*/
+        if(OMPI_RTE_MY_NODEID == src_vpid){
+            //I'm the one migrating, I have to close all outgoing endpoints
+            OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
+                sm->btl_module->btl_mig_event(BTL_MIGRATING_END, src_vpid); //call to BTL instances to close connections
+            }
+        }
+        else{
+            //I'm not migrating, just have to close connections towards migrating node
+            OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
+                sm->btl_module->btl_mig_event(BTL_NOT_MIGRATING_END, src_vpid); //call to BTL instances to close connections
+            }
+        }
+        migrating = false;
+    }
+
+    fprintf(stdout, "Signal handler call ended.\n");
+    fflush(stdout);
+
+
+}
+#endif
+
+
 static int mca_btl_base_register(mca_base_register_flag_t flags)
 {
     /* Override the per-BTL "don't run if THREAD_MULTIPLE selected"
@@ -133,6 +205,11 @@ static int mca_btl_base_open(mca_base_open_flag_t flags)
   /* get the verbosity so that BTL_VERBOSE will work */
   mca_btl_base_verbose = opal_output_get_verbosity(ompi_btl_base_framework.framework_output);
 
+#if ORTE_ENABLE_MIGRATION
+  signal(SIGUSR1,orted_btl_freeze_sig);
+  printf("+++++++++++++ SIGNAL REGISTERED\n");
+  fflush(stdout);
+#endif
   /* All done */
   return OMPI_SUCCESS;
 }

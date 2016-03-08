@@ -62,9 +62,13 @@ mca_btl_base_module_t mca_btl_self = {
     mca_btl_base_dump,
     NULL, /* mpool */
     NULL, /* register error cb */
-    mca_btl_self_ft_event
+    mca_btl_self_ft_event,
+    mca_btl_self_mig_event
 };
 
+#if ORTE_ENABLE_MIGRATION
+int mca_btl_self_mig_event(int event, void *data){}
+#endif
 
 int mca_btl_self_add_procs( struct mca_btl_base_module_t* btl, 
                             size_t nprocs, 

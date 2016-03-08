@@ -213,6 +213,14 @@ typedef uint8_t mca_btl_base_tag_t;
 #define MCA_BTL_ERROR_FLAGS_NONFATAL 0x2
 #define MCA_BTL_ERROR_FLAGS_ADD_CUDA_IPC 0x4
 
+#if ORTE_ENABLE_MIGRATION
+/* Migration-related constants*/
+#define BTL_MIGRATING_START       0   // Migration is starting and I'm the migrating node
+#define BTL_NOT_MIGRATING_START   1   // Migration is starting and I'm not the migrationg node
+#define BTL_MIGRATING_END         2   // Migration is over and I migrated
+#define BTL_NOT_MIGRATING_END     3   // Migration is over and I didn't migrate
+#endif
+
 /**
  * Asynchronous callback function on completion of an operation.
  * Completion Semantics: The descriptor can be reused or returned to the 
@@ -789,6 +797,16 @@ typedef void (*mca_btl_base_module_dump_fn_t)(
  */
 typedef int (*mca_btl_base_module_ft_event_fn_t)(int state);
 
+#if ORTE_ENABLE_MIGRATION
+/**
+ * Migration notification function
+ * @param event Event type
+ * @param data Data to be processed according to the event
+ * @return OMPI_SUCCESS or failure status
+ */
+typedef int (*mca_btl_base_module_mig_event_fn_t)(int event, void *data);
+#endif
+
 /**
  * BTL module interface functions and attributes.
  */
@@ -830,6 +848,10 @@ struct mca_btl_base_module_t {
     mca_btl_base_module_register_error_fn_t btl_register_error;
     /** fault tolerant even notification */
     mca_btl_base_module_ft_event_fn_t btl_ft_event;
+#if ORTE_ENABLE_MIGRATION
+    /** migration event notification*/
+    mca_btl_base_module_mig_event_fn_t      btl_mig_event;
+#endif
 #if OPAL_CUDA_GDR_SUPPORT
     size_t      btl_cuda_eager_limit;  /**< switch from eager to RDMA */
     size_t      btl_cuda_rdma_limit;   /**< switch from RDMA to rndv pipeline */

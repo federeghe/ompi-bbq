@@ -91,6 +91,7 @@
 
 int mig_status;
 char* mig_dest_host;
+char* mig_src_host;
 sighandler_t prev_handler;
 orte_process_name_t mig_src_p;
 
@@ -1151,6 +1152,12 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
             ORTE_ERROR_LOG(ret);
             goto CLEANUP;
         }
+        
+        /* unpack the source hostname*/
+        if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &mig_src_host, &n, OPAL_STRING))) {
+            ORTE_ERROR_LOG(ret);
+            goto CLEANUP;
+        }
 
 
         if (ORTE_PROC_MY_NAME->jobid == mig_src_p.jobid && ORTE_PROC_MY_NAME->vpid == mig_src_p.vpid ) {
@@ -1160,11 +1167,11 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         mig_status = ORTE_DAEMON_MIG_PREPARE;   // Abuse of constant
 
-        /* Create the file with source/destination to be readed by my children */
+        /* Create the file with source/destination to be read by my children */
         char filename[30];
         sprintf(filename,"/tmp/orted_mig_nodes_%i", getpid());
         FILE *f = fopen(filename,"w");
-        fprintf(f, "%u,%u,%s",mig_src_p.jobid,mig_src_p.vpid,mig_dest_host);
+        fprintf(f, "%u %u %s %s",mig_src_p.jobid,mig_src_p.vpid,mig_src_host,mig_dest_host);
         fclose(f);
 
         prev_handler = signal(SIGUSR1, orted_mig_child_ack_sig);

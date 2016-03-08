@@ -58,8 +58,13 @@ mca_btl_scif_module_t mca_btl_scif_module = {
         .btl_mpool          = NULL,
         .btl_register_error = NULL,
         .btl_ft_event       = NULL,
+        .btl_mig_event      = mca_btl_scif_mig_event
     }
 };
+
+#if ORTE_ENABLE_MIGRATION
+int mca_btl_scif_mig_event(int event, void *data){}
+#endif
 
 int mca_btl_scif_module_init (void)
 {

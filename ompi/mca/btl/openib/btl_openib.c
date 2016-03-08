@@ -123,9 +123,14 @@ mca_btl_openib_module_t mca_btl_openib_module = {
         mca_btl_base_dump,
         NULL, /* mpool */
         mca_btl_openib_register_error_cb, /* error call back registration */
-        mca_btl_openib_ft_event
+        mca_btl_openib_ft_event,
+        mca_btl_openib_mig_event
     }
 };
+
+#if ORTE_ENABLE_MIGRATION
+int mca_btl_openib_mig_event(int event, void *data){}
+#endif
 
 char* const mca_btl_openib_transport_name_strings[MCA_BTL_OPENIB_TRANSPORT_SIZE] = {
     "MCA_BTL_OPENIB_TRANSPORT_IB",

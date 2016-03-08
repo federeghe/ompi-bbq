@@ -101,9 +101,14 @@ mca_btl_sm_t mca_btl_sm = {
         mca_btl_sm_dump,
         NULL, /* mpool */
         mca_btl_sm_register_error_cb, /* register error */
-        mca_btl_sm_ft_event
+        mca_btl_sm_ft_event,
+        mca_btl_sm_mig_event
     }
 };
+
+#if ORTE_ENABLE_MIGRATION
+int mca_btl_sm_mig_event(int event, void *data){}
+#endif
 
 /*
  * calculate offset of an address from the beginning of a shared memory segment

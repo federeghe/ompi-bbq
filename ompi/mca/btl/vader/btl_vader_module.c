@@ -87,9 +87,14 @@ mca_btl_vader_t mca_btl_vader = {
         .btl_sendi = mca_btl_vader_sendi,
         .btl_dump = mca_btl_base_dump,
         .btl_register_error = vader_register_error_cb,
-        .btl_ft_event = vader_ft_event
+        .btl_ft_event = vader_ft_event,
+        .btl_mig_event = vader_mig_event
     }
 };
+
+#if ORTE_ENABLE_MIGRATION
+int vader_mig_event(int event, void *data){}
+#endif
 
 static int vader_btl_first_time_init(mca_btl_vader_t *vader_btl, int n)
 {

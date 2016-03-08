@@ -72,9 +72,14 @@ mca_btl_portals4_module_t mca_btl_portals4_module = {
         mca_btl_base_dump,
         NULL, /* mpool */
         NULL, /* register error */
-        NULL
+        NULL,
+        mca_btl_portals4_mig_event
     },
 };
+
+#if ORTE_ENABLE_MIGRATION
+int mca_btl_portals4_mig_event(int event, void *data){}
+#endif
 
 int
 mca_btl_portals4_add_procs(struct mca_btl_base_module_t* btl_base,
