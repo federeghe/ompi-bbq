@@ -114,6 +114,7 @@ static int orte_mig_criu_dump(pid_t fpid){
     criu_set_log_file("criu_dump.log");
     criu_set_log_level(4);
     criu_set_pid(fpid);
+    criu_set_leave_running(false);
     
     if(0 > (dir = open(dump_path, O_DIRECTORY))){
         opal_output_verbose(0,orte_mig_base_framework.framework_output,
