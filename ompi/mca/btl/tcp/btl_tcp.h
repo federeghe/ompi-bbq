@@ -323,5 +323,14 @@ extern mca_btl_base_descriptor_t* mca_btl_tcp_prepare_dst(
   */
 int mca_btl_tcp_ft_event(int state);
 
+#if ORTE_ENABLE_MIGRATION
+/**
+ * Migration event notification function. Called by signal mgmt routine in btl_base_frame.
+ * @param event Event type
+ * @return OMPI_SUCCESS or failure status
+ */
+extern int mca_btl_tcp_mig_event(int event, void *data);
+#endif
+
 END_C_DECLS
 #endif

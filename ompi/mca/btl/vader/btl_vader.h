@@ -254,6 +254,15 @@ int mca_btl_vader_get_knem (struct mca_btl_base_module_t *btl,
                             struct mca_btl_base_descriptor_t *des);
 #endif
 
+#if ORTE_ENABLE_MIGRATION
+/**
+ * Migration event notification function. Called by signal mgmt routine in btl_base_frame.
+ * @param event Event type
+ * @return OMPI_SUCCESS or failure status
+ */
+int vader_mig_event(int event, void *data);
+#endif
+
 /**
  * Allocate a segment.
  *

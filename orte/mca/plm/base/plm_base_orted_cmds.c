@@ -239,6 +239,7 @@ int orte_plm_base_orted_signal_local_procs(orte_jobid_t job, int32_t signal)
 #if ORTE_ENABLE_MIGRATION
 int orte_plm_mig_event(int event, void *data) {
     static char *to_send;
+    static char *mig_src;
 
     orte_mig_migration_info_t *mig_info = NULL;
     int rc;
@@ -250,6 +251,7 @@ int orte_plm_mig_event(int event, void *data) {
             command = ORTE_DAEMON_MIG_PREPARE;
             mig_info = data;
             to_send = strdup(mig_info->dst_host);
+            mig_src = strdup(mig_info->src_host);
             OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
                          "%s plm:base:orted_mig_event sending ORTE_DAEMON_MIG_PREPARE to daemons",
                          ORTE_NAME_PRINT(ORTE_PROC_MY_NAME)));
@@ -272,6 +274,13 @@ int orte_plm_mig_event(int event, void *data) {
 
             /* pack the ip of the hostname of destination node */
             if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, &to_send, 1, OPAL_STRING))) {
+                ORTE_ERROR_LOG(rc);
+                OBJ_DESTRUCT(&cmd);
+                return rc;
+            }
+            
+            /* pack the ip of the hostname of source node */
+            if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, &mig_src, 1, OPAL_STRING))) {
                 ORTE_ERROR_LOG(rc);
                 OBJ_DESTRUCT(&cmd);
                 return rc;
