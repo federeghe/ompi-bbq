@@ -844,24 +844,11 @@ static void mig_event(int event, void* data) {
 
 static void oob_mig_freeze_defreeze(bool defreezing, mca_oob_tcp_peer_t* peer) {
     if (!defreezing) {
-        if (peer->recv_ev_active) {
-            opal_event_del(&peer->recv_event);
-            peer->recv_ev_active = false;
-        }
-        if (peer->send_ev_active) {
-            opal_event_del(&peer->send_event);
-            peer->send_ev_active = false;
-        }
         peer->state = MCA_OOB_TCP_FREEZED;
         mca_oob_tcp_peer_close(peer);
     } else {
         peer->state = MCA_OOB_TCP_UNCONNECTED;
         return;
-
-        // And now, reconnect!
-        peer->state = MCA_OOB_TCP_CONNECTING;
-        // Events will be reactivated here:
-        ORTE_ACTIVATE_TCP_CONN_STATE(peer, mca_oob_tcp_peer_try_connect);
     }
 }
 
@@ -913,13 +900,7 @@ static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest, const int p
     int peer_len = strlen(peer_name);
     peer_name = realloc(peer_name, uri_len+peer_len+6+3);
     sprintf(peer_name+peer_len,";tcp://%s:%d", uri_dest, port);
-/*    peer_name[peer_len]   = ';';
-    peer_name[peer_len+1] = '\0';
-    strcat(peer_name, "tcp://");
-    strcat(peer_name, uri_dest);
-    strcat(peer_name, ":");
-    strcat(peer_name, ":");
-*/
+
     opal_output_verbose(2, orte_oob_base_framework.framework_output,
                                     "%s new peer name: %s",
                                     ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
@@ -927,10 +908,6 @@ static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest, const int p
 
     // Let's update the peer hash table
     process_uri(peer_name);
-
-    // And now, reconnect!
-//    peer->state = MCA_OOB_TCP_CONNECTED;
-//    ORTE_ACTIVATE_TCP_CONN_STATE(peer, mca_oob_tcp_peer_try_connect);
 
 }
 

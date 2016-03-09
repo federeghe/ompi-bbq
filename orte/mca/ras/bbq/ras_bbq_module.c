@@ -416,9 +416,6 @@ static int send_cmd_terminate(void)
 static int migrate(void){
     int bytes;
     local_bbq_migrate_t info;
-    
-    printf("HELLO");
-    fflush(stdout);
 
     bytes=read(socket_fd,&info,sizeof(local_bbq_migrate_t));
     if(bytes!=sizeof(local_bbq_migrate_t))
