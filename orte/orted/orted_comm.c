@@ -1184,7 +1184,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         }
 
         // Remove me:
-        SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
+        //SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
 
 
         break;
