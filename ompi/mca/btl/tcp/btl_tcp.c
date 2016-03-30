@@ -70,17 +70,59 @@ mca_btl_tcp_module_t mca_btl_tcp_module = {
 };
 
 #if ORTE_ENABLE_MIGRATION
-char hostname[20]; //Source/destination node hostname
+//TODO: remove useless variables (i.e. hostname)
+
+typedef struct{
+    struct blocked_endpoint *next;
+    mca_btl_base_endpoint_t *endpoint;
+}blocked_endpoint;
+
+char mig_hostname[20]; //Source/destination node hostname
 bool itsme;
+bool migrating = false;
+int pending_events = 0;
+opal_event_t send_ev;
+char hostname[20];
+blocked_endpoint *endpoints_list = NULL;
+
+static int mig_send_cb(int sd, short args, void *cbdata){
+    gethostname(hostname,20);
+    printf("++++++++++++++ PENDING EVENTS: %d - I'm %s - callback\n",pending_events,hostname);
+    fflush(stdout);
+    pending_events--;
+    printf("++++++++++++++ PENDING EVENTS: %d - I'm %s - callback\n",pending_events,hostname);
+    fflush(stdout);
+    if(migrating && (pending_events == 0)){
+        printf("++++++++++ NO SENDS PENDING, SIGNALING FATHER - I'm host %s\n",hostname);
+        fflush(stdout);
+        kill(getppid(), SIGUSR1);
+    }
+    return 0;
+}
 
 int mca_btl_tcp_mig_event(int event, void *data){
+    printf("+++++++++ CALLED MIG EVENT\n");
+    fflush(stdout);
+    
     switch(event){
         case BTL_MIGRATING_START:
+            migrating = true;
             itsme = true;
+            printf("++++++++++ BTL MIGRATING START\n");
+            fflush(stdout);
+            if(0 == pending_events){
+                kill(getppid(), SIGUSR1);
+            }
             break;
         case BTL_NOT_MIGRATING_START:
+            migrating = true;
             itsme = false;
-            strcpy(hostname,(const char *)data);
+            strcpy(mig_hostname,(const char *)data);
+            printf("++++++++++ BTL NOT MIGRATING START\n");
+            fflush(stdout);
+            if(0 == pending_events){
+                kill(getppid(), SIGUSR1);
+            }
             break;
         case BTL_MIGRATING_END:
             itsme = true;
@@ -394,13 +436,6 @@ int mca_btl_tcp_send( struct mca_btl_base_module_t* btl,
     mca_btl_tcp_module_t* tcp_btl = (mca_btl_tcp_module_t*) btl; 
     mca_btl_tcp_frag_t* frag = (mca_btl_tcp_frag_t*)descriptor; 
     int i;
-    
-    char hostname[30];
-    gethostname(hostname,30);
-    
-    printf("++++++++ ENDPOINT DEBUGGING:\n");
-    printf("++++++++ endpoint hostname: %s, my hostname: %s\n", endpoint->endpoint_proc->proc_ompi->proc_hostname, hostname);
-    fflush(stdout);
 
     frag->btl = tcp_btl;
     frag->endpoint = endpoint;
@@ -421,6 +456,51 @@ int mca_btl_tcp_send( struct mca_btl_base_module_t* btl,
     frag->hdr.type = MCA_BTL_TCP_HDR_TYPE_SEND;
     frag->hdr.count = 0;
     if (endpoint->endpoint_nbo) MCA_BTL_TCP_HDR_HTON(frag->hdr);
+#if ORTE_ENABLE_MIGRATION
+    char hostname[30];
+    blocked_endpoint *temp;
+    gethostname(hostname,30);
+    
+    printf("++++++++ ENDPOINT DEBUGGING:\n");
+    printf("++++++++ endpoint hostname: %s, my hostname: %s\n", endpoint->endpoint_proc->proc_ompi->proc_hostname, hostname);
+    fflush(stdout);
+    
+    printf("++++++++++++++ PENDING EVENTS: %d - I'm %s - send\n",pending_events,hostname);
+    fflush(stdout);
+    
+    if(migrating){
+        printf("+++++++++ MIGRATION IN PROGRESS (SEND)\n");
+        fflush(stdout);
+        if(itsme || strcmp(endpoint->endpoint_proc->proc_ompi->proc_hostname, mig_hostname)){
+            printf("+++++++++ IT'S ME OR MY BUDDY, FREEZING ENDPOINT\n");
+            fflush(stdout);
+            if(endpoints_list == NULL){
+                endpoints_list = (blocked_endpoint *)malloc(sizeof(blocked_endpoint));
+                endpoints_list->endpoint = endpoint;
+            }else{
+                temp = (blocked_endpoint *)malloc(sizeof(blocked_endpoint));
+                temp->endpoint = endpoint;
+                temp->next = endpoints_list;
+                endpoints_list = temp;
+            }
+            printf("++++++++++ ENDPOINT SUCCESSFULLY APPENDED\n");
+            fflush(stdout);
+            return OMPI_SUCCESS;
+        }
+    }
+
+    int rc = mca_btl_tcp_endpoint_send(endpoint,frag);
+    
+    pending_events++;
+
+    printf("++++++++++++++ PENDING EVENTS: %d - I'm %s - send\n",pending_events,hostname);
+    fflush(stdout);
+        
+    opal_event_set(orte_event_base, &send_ev, endpoint->endpoint_sd, OPAL_EV_WRITE, mig_send_cb, NULL);
+    opal_event_add(&send_ev, 0);
+    
+    return rc;
+#endif
     return mca_btl_tcp_endpoint_send(endpoint,frag);
 }
 
@@ -462,6 +542,7 @@ int mca_btl_tcp_put( mca_btl_base_module_t* btl,
     frag->hdr.type = MCA_BTL_TCP_HDR_TYPE_PUT;
     frag->hdr.count = frag->base.des_dst_cnt;
     if (endpoint->endpoint_nbo) MCA_BTL_TCP_HDR_HTON(frag->hdr);
+    
     return ((i = mca_btl_tcp_endpoint_send(endpoint,frag)) >= 0 ? OMPI_SUCCESS : i);
 }
 
