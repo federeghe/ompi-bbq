@@ -252,7 +252,7 @@ static int recv_nodes_reply(void)
     
     temp->name=strdup(response_item.hostname);
     temp->slots_inuse=0;
-    temp->slots_max=response_item.slots_available;
+    temp->slots_max=0;
     temp->slots=response_item.slots_available;
     temp->state=ORTE_NODE_STATE_UP;
 
@@ -340,8 +340,9 @@ static int send_cmd_node_request(void)
     int i;
     
     command.flags = 0;
+    command.flags |= BBQ_OPT_MIG_AVAILABLE; // TODO: Remove me
 #if ORTE_ENABLE_MIGRATION
-    if(NULL != orte_mig_base.active_module && orte_mig_base.active_module->get_state() == MIG_AVAILABLE){
+    if(NULL != orte_mig_base.active_module ){
         command.flags |= BBQ_OPT_MIG_AVAILABLE;
     }
 #endif

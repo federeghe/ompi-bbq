@@ -63,7 +63,9 @@ mca_btl_tcp_module_t mca_btl_tcp_module = {
         NULL, /* mpool */
         NULL, /* register error */
         mca_btl_tcp_ft_event,
+#if ORTE_ENABLE_MIGRATION
         mca_btl_tcp_mig_event
+#endif
     }
 };
 

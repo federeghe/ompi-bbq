@@ -63,7 +63,9 @@ mca_btl_base_module_t mca_btl_self = {
     NULL, /* mpool */
     NULL, /* register error cb */
     mca_btl_self_ft_event,
+#if ORTE_ENABLE_MIGRATION
     mca_btl_self_mig_event
+#endif
 };
 
 #if ORTE_ENABLE_MIGRATION

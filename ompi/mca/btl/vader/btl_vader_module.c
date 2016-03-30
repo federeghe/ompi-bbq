@@ -88,7 +88,9 @@ mca_btl_vader_t mca_btl_vader = {
         .btl_dump = mca_btl_base_dump,
         .btl_register_error = vader_register_error_cb,
         .btl_ft_event = vader_ft_event,
+#if ORTE_ENABLE_MIGRATION
         .btl_mig_event = vader_mig_event
+#endif
     }
 };
 

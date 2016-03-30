@@ -87,6 +87,8 @@ orte_mig_base_module_t orte_mig_criu_module = {
 
 static int init(void){
     /*TODO: checks to flag us as available*/
+
+
     mig_state = MIG_AVAILABLE;
     opal_output_verbose(0, orte_mig_base_framework.framework_output,
                 "%s mig:criu: Criu module initialized.",
@@ -115,6 +117,7 @@ static int orte_mig_criu_dump(pid_t fpid){
     criu_set_log_level(4);
     criu_set_pid(fpid);
     criu_set_leave_running(false);
+    criu_set_tcp_established(true);
     
     if(0 > (dir = open(dump_path, O_DIRECTORY))){
         opal_output_verbose(0,orte_mig_base_framework.framework_output,
@@ -257,6 +260,7 @@ static int orte_mig_criu_restore(void) {
     criu_set_images_dir_fd(dir);
     criu_set_log_file("criu_restore.log");
     criu_set_log_level(4);
+    criu_set_tcp_established(true);
 
 
     int status = criu_restore();
@@ -267,7 +271,7 @@ static int orte_mig_criu_restore(void) {
         exit(ORTE_ERROR);
     }
 
-    if (0 > kill(pid_to_restore, SIGUSR1) ) {
+    if (0 > kill(pid_to_restore, SIGUSR2) ) {
         opal_output(0,"%s mig:criu Can't signal process %i",
                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), pid_to_restore);
         exit(ORTE_ERROR);

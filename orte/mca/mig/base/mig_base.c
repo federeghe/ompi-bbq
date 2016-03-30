@@ -119,6 +119,11 @@ int orte_mig_base_fwd_info(int flag){
             orte_oob_base_mig_event(ORTE_MIG_DONE, (void*)(mig_info->dst_host));
             change_hnp_internal_references();
         break;
+        case ORTE_MIG_ABORTED_FLAG:
+            orte_ras_base.active_module->send_mig_info(ORTE_MIG_ABORTED);
+            // TODO
+
+        break;
         default:
             opal_output_verbose(0, orte_mig_base_framework.framework_output,
                 "%s mig:base: Unknown message to forward.",

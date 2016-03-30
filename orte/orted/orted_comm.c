@@ -93,6 +93,7 @@ int mig_status;
 char* mig_dest_host;
 char* mig_src_host;
 sighandler_t prev_handler;
+sighandler_t prev_handler_2;
 orte_process_name_t mig_src_p;
 
 void orted_mig_callback(int status, orte_process_name_t *peer,
@@ -1174,14 +1175,14 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         fprintf(f, "%u %u %s %s",mig_src_p.jobid,mig_src_p.vpid,mig_src_host,mig_dest_host);
         fclose(f);
 
-        prev_handler = signal(SIGUSR1, orted_mig_child_ack_sig);
+        //prev_handler = signal(SIGUSR1, orted_mig_child_ack_sig);
 
         /* Now I send the signal to all children to let them know that
          * they must read the file.
          */
-        if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, SIGUSR1))) {
+        /*if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, SIGUSR1))) {
             ORTE_ERROR_LOG(ret);
-        }
+        }*/
 
         // Remove me:
         SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
@@ -1215,13 +1216,13 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
 // Called by orted-restore signal when we are restoring
 static void orted_mig_restore_sig(int sig) {
-    if (OPAL_UNLIKELY(sig != SIGUSR1)) {
+    if (OPAL_UNLIKELY(sig != SIGUSR2)) {
         // ???
         return;
     }
 
-    // Restore the original signal handler for USR1
-    signal(SIGUSR1, prev_handler);
+    // Restore the original signal handler for USR2
+    signal(SIGUSR2, prev_handler_2);
 
     mig_status = ORTE_DAEMON_MIG_DONE;
 
@@ -1283,7 +1284,7 @@ void orted_mig_callback(int status, orte_process_name_t *peer,
 
             // Set the signal handler that will be executed during restore
             // after the signal throw by orted-restore
-            prev_handler = signal(SIGUSR1, orted_mig_restore_sig);
+            prev_handler_2 = signal(SIGUSR2, orted_mig_restore_sig);
 
             orte_oob_base_mig_event(ORTE_MIG_EXEC, &mig_src_p);
             

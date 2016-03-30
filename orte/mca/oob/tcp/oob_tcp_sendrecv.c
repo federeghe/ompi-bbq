@@ -370,6 +370,8 @@ static int read_bytes(mca_oob_tcp_peer_t* peer)
                                 "%s-%s mca_oob_tcp_msg_recv: peer closed connection on SD %d",
                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
                                 ORTE_NAME_PRINT(&(peer->name)), peer->sd);
+
+            return ORTE_ERR_RESOURCE_BUSY; // TODO remove me
 #if ORTE_ENABLE_MIGRATION
             if (mca_oob_tcp_migrating_me || ( mca_oob_tcp_migrating_peer != NULL &&
                 peer->name.jobid == mca_oob_tcp_migrating_peer->name.jobid &&

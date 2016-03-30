@@ -229,7 +229,9 @@ typedef uint8_t orte_plm_cmd_flag_t;
 /* PLM migration flags*/
 #define ORTE_MIG_PREPARE_ACK_FLAG       1
 #define ORTE_MIG_READY_FLAG             2
-#define ORTE_MIG_DONE_FLAG              3
+#define ORTE_MIG_ABORTED_FLAG           3
+#define ORTE_MIG_DONE_FLAG              4
+
 #endif
 
 

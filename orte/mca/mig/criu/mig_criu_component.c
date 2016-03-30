@@ -15,6 +15,8 @@
 
 #include "mig_criu.h"
 #include "orte/mca/mig/mig.h"
+#include "criu/criu.h"
+
 
 static int mig_criu_register(void);
 static int mig_criu_open(void);
@@ -42,9 +44,7 @@ orte_mig_criu_component_t mca_mig_criu_component = {
             mig_criu_register
         },
         {
-            /* The component is checkpoint ready 
-             * TODO: what is this???
-             */
+            /* The component is checkpoint ready */
             MCA_BASE_METADATA_PARAM_CHECKPOINT
         }
     }
@@ -89,6 +89,15 @@ static int orte_mig_criu_component_query(mca_base_module_t **module, int *priori
      * selected.  
      */
     
+
+/*    if ( criu_check() != 0 ) {
+        opal_output_verbose(0, orte_mig_base_framework.framework_output,
+                    "%s mig:criu: Criu not available.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        *module = NULL;
+        return ORTE_ERROR;
+    }
+*/
     OPAL_OUTPUT_VERBOSE((2, orte_mig_base_framework.framework_output,
                          "%s mig:criu: available for selection",
                          ORTE_NAME_PRINT(ORTE_PROC_MY_NAME)));

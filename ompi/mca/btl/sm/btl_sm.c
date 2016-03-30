@@ -102,7 +102,9 @@ mca_btl_sm_t mca_btl_sm = {
         NULL, /* mpool */
         mca_btl_sm_register_error_cb, /* register error */
         mca_btl_sm_ft_event,
+#if ORTE_ENABLE_MIGRATION
         mca_btl_sm_mig_event
+#endif
     }
 };
 

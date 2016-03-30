@@ -20,7 +20,8 @@
 #define BBQ_CMD_MIGRATION_SUCCEEDED 7
 
 /* Options */
-#define BBQ_OPT_MIG_AVAILABLE 1
+#define BBQ_OPT_MIG_AVAILABLE 1 /* ras -> bbq */
+#define BBQ_OPT_PREDUMP_REQ 2   /* bbq -> ras */
 
 #include <stdint.h>
 
@@ -28,7 +29,7 @@
 struct local_bbq_cmd_t {
 	uint32_t jobid;			/* The jobid  */
 	uint8_t cmd_type;		/* Command number: */
-        uint8_t flags;                 /* Flags */
+    uint8_t flags;          /* Flags */
 							/* Other things here? */
 };
 typedef struct local_bbq_cmd_t local_bbq_cmd_t;
@@ -54,7 +55,7 @@ typedef struct local_bbq_res_item_t local_bbq_res_item_t;
 struct local_bbq_migrate_t {
 	uint32_t jobid;
 	char src[256];                                  /* orte_node_t / source node */
-        char dest[256];                                 /* orte_node_t / destination node */
+    char dest[256];                                 /* orte_node_t / destination node */
 };
 typedef struct local_bbq_migrate_t local_bbq_migrate_t;
 
