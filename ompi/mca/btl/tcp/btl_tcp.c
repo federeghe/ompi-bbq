@@ -68,16 +68,17 @@ mca_btl_tcp_module_t mca_btl_tcp_module = {
 };
 
 #if ORTE_ENABLE_MIGRATION
+
 //TODO: remove useless variables (i.e. hostname)
 
 typedef struct{
     struct blocked_endpoint *next;
     mca_btl_base_endpoint_t *endpoint;
+    mca_btl_tcp_frag_t* frag;
 }blocked_endpoint;
 
 char mig_hostname[20]; //Source/destination node hostname
-bool itsme;
-bool migrating = false;
+int migration_state = BTL_RUNNING;
 int pending_events = 0;
 opal_event_t send_ev;
 char hostname[20];
@@ -85,48 +86,106 @@ blocked_endpoint *endpoints_list = NULL;
 
 static int mig_send_cb(int sd, short args, void *cbdata){
     gethostname(hostname,20);
-    printf("++++++++++++++ PENDING EVENTS: %d - I'm %s - callback\n",pending_events,hostname);
+    //printf("++++++++++++++ PENDING EVENTS: %d - I'm %s - callback\n",pending_events,hostname);
     fflush(stdout);
     pending_events--;
-    printf("++++++++++++++ PENDING EVENTS: %d - I'm %s - callback\n",pending_events,hostname);
+    //printf("++++++++++++++ PENDING EVENTS: %d - I'm %s - callback\n",pending_events,hostname);
     fflush(stdout);
-    if(migrating && (pending_events == 0)){
-        printf("++++++++++ NO SENDS PENDING, SIGNALING FATHER - I'm host %s\n",hostname);
-        fflush(stdout);
+    if((BTL_MIGRATING_PREPARE == migration_state || BTL_NOT_MIGRATING_PREPARE == migration_state) && 0 == pending_events){
+        //printf("++++++++++ NO SENDS PENDING, SIGNALING FATHER - I'm host %s\n",hostname);
+        //fflush(stdout);
         kill(getppid(), SIGUSR1);
     }
     return 0;
 }
 
-int mca_btl_tcp_mig_event(int event, void *data){
-    printf("+++++++++ CALLED MIG EVENT\n");
-    fflush(stdout);
+int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
+    /*blocked_endpoint *temp;
     
-    switch(event){
-        case BTL_MIGRATING_START:
-            migrating = true;
-            itsme = true;
-            printf("++++++++++ BTL MIGRATING START\n");
-            fflush(stdout);
+    if(BTL_MIGRATING_DONE == migration_state){
+        do{
+            temp = endpoints_list;
+            endpoints_list = temp->next;
+            temp->endpoint->endpoint_state = MCA_BTL_TCP_CONNECTING;
+            temp->endpoint->endpoint_sd = -1;
+            //TODO: maybe we have to cycle on this until it's successfully sent?
+            mca_btl_tcp_endpoint_send(temp->endpoint, temp->frag);
+            free(temp);
+        }while(endpoints_list != NULL);
+    }else{
+        //TODO: I'm not the migrating node
+    }
+    
+    migration_state = BTL_RUNNING;
+    */
+    
+    mca_btl_base_endpoint_t *endpoint, *next;
+    mca_btl_tcp_module_t *tcp_btl = (mca_btl_tcp_module_t *)btl;
+    char addr[16];
+    char *tok;
+    int i = 0;
+    
+    opal_output(0, "%s btl: restoring events...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    
+    OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
+        if(MCA_BTL_TCP_FREEZED == endpoint->endpoint_state){
+            if(BTL_NOT_MIGRATING_DONE == migration_state){
+                //Change destination address
+                addr = strchr(mig_hostname, '@');
+                tok = strtok(addr,".");
+                while(tok != NULL){
+                    endpoint->endpoint_addr->addr_inet._union_inet.u6_addr32[i] = atoi(tok);
+                    i++;
+                    tok = strtok(addr,".");
+                }
+                strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, mig_hostname);
+                //TODO: QUA
+            }
+            endpoint->endpoint_sd = -1;
+            mca_btl_tcp_endpoint_send(endpoint, NULL);
+        }
+    }
+    return OMPI_SUCCESS;
+}
+
+int mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
+    mca_btl_base_endpoint_t *endpoint, *next;
+    mca_btl_tcp_module_t *tcp_btl = (mca_btl_tcp_module_t *)btl;
+    
+    opal_output(0, "%s btl: closing sockets...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    
+    OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
+        if(MCA_BTL_TCP_FREEZED == endpoint->endpoint_state && 0 != close(endpoint->endpoint_sd)){
+            opal_output(0, "%s btl: error while closing socket on %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
+        }
+    }
+}
+
+int mca_btl_tcp_mig_event(int event, void *data){    
+    migration_state = event;
+    switch(migration_state){
+        case BTL_MIGRATING_PREPARE:
             if(0 == pending_events){
                 kill(getppid(), SIGUSR1);
             }
             break;
-        case BTL_NOT_MIGRATING_START:
-            migrating = true;
-            itsme = false;
+        case BTL_NOT_MIGRATING_PREPARE:
             strcpy(mig_hostname,(const char *)data);
-            printf("++++++++++ BTL NOT MIGRATING START\n");
-            fflush(stdout);
             if(0 == pending_events){
-                kill(getppid(), SIGUSR1);
+                kill(getppid(), SIGUSR1); //TODO: do we need control over pending_events?
             }
             break;
-        case BTL_MIGRATING_END:
-            itsme = true;
+        case BTL_MIGRATING_EXEC:
+            mca_btl_tcp_mig_close_sockets((mca_btl_base_module_t *) data);
+            kill(getppid(), SIGUSR1);
             break;
-        case BTL_NOT_MIGRATING_END:
-            itsme = false;
+        case BTL_NOT_MIGRATING_EXEC:
+            strcpy(mig_hostname,(const char *)data);
+            kill(getppid(), SIGUSR1);
+            break;
+        case BTL_NOT_MIGRATING_DONE:
+        case BTL_MIGRATING_DONE:
+            mca_btl_tcp_mig_restore((mca_btl_base_module_t *) data);
             break;
         default:
             return;
@@ -454,52 +513,58 @@ int mca_btl_tcp_send( struct mca_btl_base_module_t* btl,
     frag->hdr.type = MCA_BTL_TCP_HDR_TYPE_SEND;
     frag->hdr.count = 0;
     if (endpoint->endpoint_nbo) MCA_BTL_TCP_HDR_HTON(frag->hdr);
+
 #if ORTE_ENABLE_MIGRATION
     char hostname[30];
     blocked_endpoint *temp;
     gethostname(hostname,30);
     
-    printf("++++++++ ENDPOINT DEBUGGING:\n");
-    printf("++++++++ endpoint hostname: %s, my hostname: %s\n", endpoint->endpoint_proc->proc_ompi->proc_hostname, hostname);
-    fflush(stdout);
-    
-    printf("++++++++++++++ PENDING EVENTS: %d - I'm %s - send\n",pending_events,hostname);
-    fflush(stdout);
-    
-    if(migrating){
-        printf("+++++++++ MIGRATION IN PROGRESS (SEND)\n");
-        fflush(stdout);
-        if(itsme || strcmp(endpoint->endpoint_proc->proc_ompi->proc_hostname, mig_hostname)){
-            printf("+++++++++ IT'S ME OR MY BUDDY, FREEZING ENDPOINT\n");
-            fflush(stdout);
+    switch(migration_state){
+        case BTL_MIGRATING_PREPARE:
+        case BTL_MIGRATING_EXEC:
+            endpoint->endpoint_state = MCA_BTL_TCP_FREEZED;
+            break;
+        case BTL_NOT_MIGRATING_PREPARE:
+        case BTL_NOT_MIGRATING_EXEC:
+            if (strcmp(endpoint->endpoint_proc->proc_ompi->proc_hostname, mig_hostname)){
+                endpoint->endpoint_state = MCA_BTL_TCP_FREEZED;
+            }
+            break;
+    }
+    /*
+    if(BTL_MIGRATING_PREPARE == migration_state || BTL_NOT_MIGRATING_PREPARE == migration_state){
+        if(BTL_MIGRATING_PREPARE == migration_state || 
+                strcmp(endpoint->endpoint_proc->proc_ompi->proc_hostname, mig_hostname)){
             if(endpoints_list == NULL){
                 endpoints_list = (blocked_endpoint *)malloc(sizeof(blocked_endpoint));
                 endpoints_list->endpoint = endpoint;
+                endpoints_list->frag = frag;
+                endpoints_list->next = NULL;
             }else{
                 temp = (blocked_endpoint *)malloc(sizeof(blocked_endpoint));
                 temp->endpoint = endpoint;
+                temp->frag = frag;
                 temp->next = endpoints_list;
                 endpoints_list = temp;
             }
-            printf("++++++++++ ENDPOINT SUCCESSFULLY APPENDED\n");
-            fflush(stdout);
+            endpoint->endpoint_state = MCA_BTL_TCP_FREEZED;
             return OMPI_SUCCESS;
         }
     }
+    */
 
     int rc = mca_btl_tcp_endpoint_send(endpoint,frag);
-    
+/*    
     pending_events++;
 
-    printf("++++++++++++++ PENDING EVENTS: %d - I'm %s - send\n",pending_events,hostname);
-    fflush(stdout);
         
     opal_event_set(orte_event_base, &send_ev, endpoint->endpoint_sd, OPAL_EV_WRITE, mig_send_cb, NULL);
     opal_event_add(&send_ev, 0);
-    
+*/    
     return rc;
-#endif
+#else
     return mca_btl_tcp_endpoint_send(endpoint,frag);
+#endif
 }
 
 

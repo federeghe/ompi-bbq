@@ -417,7 +417,6 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
         switch(flag){
         /* Messages sent from daemons telling us they're aware of the imminent migration */
         case ORTE_MIG_PREPARE_ACK_FLAG:
-
             if (orte_node_pool->size - orte_node_pool->number_free == ++ack_count){
                 opal_output_verbose(5, orte_plm_base_framework.framework_output,
                                                 "%s plm:base:receive all prepare migration ack received",

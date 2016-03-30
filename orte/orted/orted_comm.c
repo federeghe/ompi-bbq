@@ -1176,15 +1176,17 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         prev_handler = signal(SIGUSR1, orted_mig_child_ack_sig);
 
-        /* Now I send the signal to all children to let them know that
-         * they must read the file.
-         */
-        if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, SIGUSR1))) {
-            ORTE_ERROR_LOG(ret);
+        if(ORTE_PROC_IS_HNP){
+            //I'm the HNP, send ack immediately
+            SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
+        }else{
+            /* Now I send the signal to all children to let them know that
+             * they must read the file. They will signal me back later.
+             */
+            if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, SIGUSR1))) {
+                ORTE_ERROR_LOG(ret);
+            }
         }
-
-        // Remove me:
-        //SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
 
 
         break;
@@ -1192,8 +1194,18 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         opal_output(0, "%s orted: command ORTE_DAEMON_MIG_EXEC received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
         mig_status = ORTE_DAEMON_MIG_EXEC;   // Abuse of constant
-
-        SEND_MIG_ACK(ORTE_MIG_READY_FLAG);
+        
+        if(ORTE_PROC_IS_HNP){
+            //I'm the HNP, send ack immediately
+            SEND_MIG_ACK(ORTE_MIG_READY_FLAG);
+        }else{
+            /* Now I send the signal to all children to let them know that
+             * they must close the sockets. They will signal me back later.
+             */
+            if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, SIGUSR1))) {
+                ORTE_ERROR_LOG(ret);
+            }
+        }
 
         break;
     case ORTE_DAEMON_MIG_DONE:
@@ -1219,6 +1231,8 @@ static void orted_mig_restore_sig(int sig) {
         // ???
         return;
     }
+    
+    opal_output(0, "%s orted: MIG RESTORE SIG", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
     // Restore the original signal handler for USR1
     signal(SIGUSR1, prev_handler);
@@ -1246,25 +1260,35 @@ static void orted_mig_child_ack_sig(int sig) {
 
     // We have to wait that all children report
     // that are ready for migration via SIGUSR1
+    
+    opal_output(0, "%s orted: received ack from a child.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
     static unsigned int received=0;
-    if (++received == orte_process_info.num_procs) {
+    if (++received == orte_local_children->size) {
 
         // Restore the original signal handler for USR1
-        signal(SIGUSR1, prev_handler);
+        //signal(SIGUSR1, prev_handler);
 
         // Declare some variables to send the ack flag
         orte_daemon_cmd_flag_t command;
         int ret;
         opal_buffer_t *answer;
         uint8_t flag;
-
-        SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
+        switch(mig_status){
+            case ORTE_DAEMON_MIG_PREPARE:
+                SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
+                opal_output(0, "%s orted: PREPARE_ACK sent to HNP", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                received = 0;
+                break;
+            case ORTE_DAEMON_MIG_EXEC:
+                SEND_MIG_ACK(ORTE_MIG_READY_FLAG);
+                opal_output(0, "%s orted: READY_ACK sent to HNP", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                received = 0;
+                break;
+            default:
+                ;
+        }
     }
-
-    opal_output(0, "%s orted: received ack from a child.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
-
 }
 
 void orted_mig_callback(int status, orte_process_name_t *peer,
