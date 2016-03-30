@@ -30,6 +30,9 @@
 #include "ompi/mca/btl/btl.h"
 #include "ompi/mca/btl/base/base.h"
 
+#include "orte/mca/mig/mig_types.h"
+#include "orte/mca/oob/base/base.h"
+
 mca_btl_active_message_callback_t mca_btl_base_active_message_trigger[MCA_BTL_TAG_MAX];
 
 /*
@@ -87,8 +90,8 @@ static void orted_btl_freeze_sig(int sig) {
     char filename[40];
     static uint32_t src_jobid;
     static uint32_t src_vpid;
-    static char dst[20];
-    static char src[20];
+    static char dst[30];
+    static char src[30];
     mca_btl_base_selected_module_t *sm, *next;
     
     sprintf(filename,"/tmp/orted_mig_nodes_%i",getppid());
@@ -107,10 +110,14 @@ static void orted_btl_freeze_sig(int sig) {
             return;
         }
         
+        // TODO: Fix format string vulnerability
         fscanf(mig_info,"%u %u %s %s",&src_jobid,&src_vpid,src,dst);
         
         if(OMPI_RTE_MY_NODEID == src_vpid){
-            //I'm the one migrating, I have to close all outgoing endpoints
+            //I'm the one migrating
+            orte_oob_base_mig_event(ORTE_MIG_PREPARE, NULL);
+
+            // I have to close all outgoing endpoints
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
                 sm->btl_module->btl_mig_event(BTL_MIGRATING_START, src); //call to BTL instances to close connections
             }
@@ -126,6 +133,11 @@ static void orted_btl_freeze_sig(int sig) {
     else{
         /* Migration is already ongoing. Endpoint must restore communications towards the new node*/
         if(OMPI_RTE_MY_NODEID == src_vpid){
+
+            //I'm the one migrating
+            orte_oob_base_mig_event(ORTE_MIG_EXEC, dst);
+
+
             //I'm the one migrating, I have to close all outgoing endpoints
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
                 sm->btl_module->btl_mig_event(BTL_MIGRATING_END, src_vpid); //call to BTL instances to close connections
