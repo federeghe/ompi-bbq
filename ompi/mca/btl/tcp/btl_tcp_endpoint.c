@@ -384,7 +384,23 @@ int mca_btl_tcp_endpoint_send(mca_btl_base_endpoint_t* btl_endpoint, mca_btl_tcp
             opal_list_append(&btl_endpoint->endpoint_frags, (opal_list_item_t*)frag);
         }
         break;
+#if ORTE_ENABLE_MIGRATION
+    case MCA_BTL_TCP_FREEZED:
+        if(BTL_MIGRATING_DONE == migration_state){
+            opal_event_set(opal_event_base, &btl_endpoint->endpoint_send_event,
+                    btl_endpoint->endpoint_sd,
+                    OPAL_EV_WRITE,
+                    mca_btl_tcp_endpoint_send_handler,
+                    btl_endpoint);
+            mca_btl_tcp_endpoint_start_connect(btl_endpoint);
+        }else{
+            opal_output(0, "%s btl:endpoint: endpoint freezed, deleting send event", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            opal_event_del(&btl_endpoint->endpoint_send_event);
+        }
+        break;
+#endif
     }
+        
     OPAL_THREAD_UNLOCK(&btl_endpoint->endpoint_send_lock);
     return rc;
 }
@@ -945,6 +961,12 @@ static void mca_btl_tcp_endpoint_recv_handler(int sd, short flags, void* user)
          */
         OPAL_THREAD_UNLOCK(&btl_endpoint->endpoint_recv_lock);
         break;
+#if ORTE_ENABLE_MIGRATION
+    case MCA_BTL_TCP_FREEZED:
+        opal_output(0, "%s btl:endpoint: endpoint freezed, deleting recive event", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        opal_event_del(&btl_endpoint->endpoint_recv_event);
+        break;
+#endif
     default:
         OPAL_THREAD_UNLOCK(&btl_endpoint->endpoint_recv_lock);
         BTL_ERROR(("invalid socket state(%d)", btl_endpoint->endpoint_state));

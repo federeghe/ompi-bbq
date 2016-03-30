@@ -784,10 +784,12 @@ static void mig_event(int event, void* data) {
 
         }
         else {
-            opal_output (0, "%s:oob_tcp_mig_event: data==NULL.\n",
-            			ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-            ORTE_ERROR_LOG(ORTE_ERR_BAD_PARAM);
-            return;
+            // Process migration: in this case the MPI process received from the orted
+            // the signal via btl to migrate. In this case I have to close the sockets
+            // between me and the orted.
+            mca_oob_tcp_migrating_me=true;
+            printf ("%s:oob_tcp_mig_event: App migration.\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
 
         }
 
@@ -795,7 +797,7 @@ static void mig_event(int event, void* data) {
 
     case ORTE_MIG_EXEC:
 
-    	if (!AM_I_NODE(&peer_name)) {
+    	if (!mca_oob_tcp_migrating_me) {
 
     		if (OPAL_UNLIKELY(!ORTE_PROC_IS_HNP)) {
                 opal_output (0, "%s:oob_tcp_mig_event: I'm not the migrating node nor the HNP,"
@@ -820,13 +822,15 @@ static void mig_event(int event, void* data) {
             return;
     	}
 
+        printf ("%s:oob_tcp_mig_event: App migration(2).\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
 		// Oh! Wow! I'm the migrating node!
      	mig_me(false);
 
     break;
 
     case ORTE_MIG_DONE:
-    	if (AM_I_NODE(&peer_name)) {
+    	if (mca_oob_tcp_migrating_me) {
             mig_me(true);
     	} else {
             mca_oob_tcp_migrating_peer = NULL;
@@ -863,7 +867,6 @@ static void mig_me(bool defreezing) {
 	// Let's freeze all peers
     opal_output (0, "%s:oob_tcp_mig_event: freezing all peers...\n",
                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
 
     if (OPAL_SUCCESS == opal_hash_table_get_first_key_uint64(&mca_oob_tcp_module.peers, &ui64,
                                                              (void**)&peer_tmp, (void**)&nptr)) {

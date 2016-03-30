@@ -23,9 +23,10 @@
 #include "orte/types.h"
 
 
-#include <libtar.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
+
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #endif
@@ -46,6 +47,8 @@
 
 // The listening port for migration
 #define PORT_MIGRATION_COPY 2693
+#define TO_SEND_FILE "/tmp/tosend.tar.gz"
+#define TO_UNTAR_FILE "/tmp/tountar.tar.gz"
 
 // The interval between two try to connect to the destination host.
 // The first attempt to connect should be successful, but it may
@@ -118,6 +121,8 @@ int orte_mig_base_fwd_info(int flag){
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_DONE);
             orte_oob_base_mig_event(ORTE_MIG_DONE, (void*)(mig_info->dst_host));
             change_hnp_internal_references();
+            orte_plm.mig_event(ORTE_MIG_DONE, NULL);
+
         break;
         case ORTE_MIG_ABORTED_FLAG:
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_ABORTED);
@@ -160,7 +165,6 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
 
     struct sockaddr_in addr;
     int socket_fd;
-    TAR *tar;
     
     /* Open socket towards destination node to send dump directory */
     if(0 > (socket_fd = socket(AF_INET,SOCK_STREAM,0)))
@@ -184,6 +188,16 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
     addr.sin_addr.s_addr = inet_addr(cleaned_host);
     addr.sin_port = htons(PORT_MIGRATION_COPY);
 
+    opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:base Compressing folder...",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
+    char *cmd;
+    asprintf(&cmd, "tar -P -czf %s %s", TO_SEND_FILE, path);
+    system(cmd);
+    free(cmd);
+
+
     while(0>connect(socket_fd,(struct sockaddr *)&addr, sizeof(addr)))
     {
         opal_output_verbose(0, orte_mig_base_framework.framework_output,
@@ -194,15 +208,37 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
     }
 
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
-                "%s orted:mig:base Connected to destination node. Compressing folder...",
+                "%s orted:mig:base Connected to destination node. Sending gzip...",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
 
     // First of all send the pid of the process to restore
     write(socket_fd, (char *)&pid_to_restore,sizeof(pid_t));
 
-    // Then send the image as tar archive.
-    tar_fdopen(&tar, socket_fd, NULL, NULL, O_WRONLY, 0644, 0);
-    tar_append_tree(tar, path, ".");
+    struct stat file_stat;
+    stat(TO_SEND_FILE, &file_stat);
+    int size = file_stat.st_size;
+
+    write(socket_fd, (char *)&size,sizeof(int));
+
+    FILE *f = fopen(TO_SEND_FILE, "rb");
+    char *content = malloc(size);
+    fread(content, size, 1, f);
+    fclose(f);
+
+    char *og_content = content;
+    int bytes_sent=0;
+    while(size > 0) {
+        bytes_sent = send(socket_fd, content, size,0);
+        if (bytes_sent == 0)
+            break; //socket probably closed
+        else if (bytes_sent < 0)
+            return ORTE_ERROR; //handle errors appropriately
+        content += bytes_sent;
+        size    -= bytes_sent;
+    }
+
+    free(og_content);
     close(socket_fd);
 
     return ORTE_SUCCESS;
@@ -222,7 +258,7 @@ int orte_mig_base_restore(char *path) {
     socklen_t size_addr_cl;
     int socket_fd, socket_cl;
     int pid_to_restore;
-    TAR *tar;
+    int file_size;
 
     /* Open socket towards source node to recv dump directory */
     if(0 > (socket_fd = socket(AF_INET,SOCK_STREAM,0)))
@@ -257,19 +293,48 @@ int orte_mig_base_restore(char *path) {
     
     // First of all we receive the pid number of the parent process
     // to restore
-    read(socket_cl, (char *)&pid_to_restore,sizeof(pid_t));
+    recv(socket_cl, (char *)&pid_to_restore,sizeof(pid_t),0);
+
+    // Then the subsequent file size
+    recv(socket_cl, (char *)&file_size,sizeof(int),0);
+
+    char *content = malloc(file_size);
+
+    char *og_content = content;
+    int bytes_recv=0;
+    int size = file_size;
+    while(size > 0) {
+        bytes_recv = recv(socket_cl, content, size,0);
+        if (bytes_recv == 0)
+            return ORTE_ERROR; //handle errors appropriately
+        else if (bytes_recv < 0)
+            return ORTE_ERROR; //handle errors appropriately
+        content   += bytes_recv;
+        size -= bytes_recv;
+    }
+
+    close(socket_cl);
+
+    opal_output_verbose(0,orte_mig_base_framework.framework_output,
+                "%s orted:mig:base Received %i bytes...",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), file_size);
+
+    FILE *f = fopen(TO_UNTAR_FILE, "wb");
+    fwrite(og_content,file_size,1,f);
+    fclose(f);
+    free(og_content);
 
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:base Decompressing folder...",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
     
-    // FIXME: tar does not handle socket recv correctly, it may happen
-    // that the receive fails.
-    tar_fdopen(&tar, socket_cl, NULL, NULL, O_RDONLY, 0644, 0);
-    tar_extract_all(tar, path);
-    tar_close(tar);
-    close(socket_fd);
-    
+    char *cmd;
+    mkdir(path,0700);
+    asprintf(&cmd, "tar -P -xzf %s -C %s --strip-components=2", TO_UNTAR_FILE, path);
+    system(cmd);
+    free(cmd);
+
     return pid_to_restore;
 }
 

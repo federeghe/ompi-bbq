@@ -12,6 +12,7 @@
 #define	MIG_TYPES_H
 
 #include "orte_config.h"
+#include "orte/types.h"
 
 // Constants for event
 #define ORTE_MIG_PREPARE 0

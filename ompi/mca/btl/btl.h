@@ -215,10 +215,13 @@ typedef uint8_t mca_btl_base_tag_t;
 
 #if ORTE_ENABLE_MIGRATION
 /* Migration-related constants*/
-#define BTL_MIGRATING_START       0   // Migration is starting and I'm the migrating node
-#define BTL_NOT_MIGRATING_START   1   // Migration is starting and I'm not the migrationg node
-#define BTL_MIGRATING_END         2   // Migration is over and I migrated
-#define BTL_NOT_MIGRATING_END     3   // Migration is over and I didn't migrate
+#define BTL_MIGRATING_PREPARE       0
+#define BTL_NOT_MIGRATING_PREPARE   1
+#define BTL_MIGRATING_EXEC          2
+#define BTL_NOT_MIGRATING_EXEC      3
+#define BTL_MIGRATING_DONE          4
+#define BTL_NOT_MIGRATING_DONE      5
+#define BTL_RUNNING                 6
 #endif
 
 /**

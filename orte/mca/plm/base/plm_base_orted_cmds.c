@@ -307,6 +307,20 @@ int orte_plm_mig_event(int event, void *data) {
             break;
             
         case ORTE_MIG_DONE:
+            command = ORTE_DAEMON_MIG_DONE;
+
+            OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
+                         "%s plm:base:orted_mig_event sending ORTE_DAEMON_MIG_DONE to daemons",
+                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME)));
+
+            OBJ_CONSTRUCT(&cmd, opal_buffer_t);
+
+            /* pack the command */
+            if (ORTE_SUCCESS != (rc = opal_dss.pack(&cmd, &command, 1, ORTE_DAEMON_CMD))) {
+                ORTE_ERROR_LOG(rc);
+                OBJ_DESTRUCT(&cmd);
+                return rc;
+            }
             break;
             
         default:

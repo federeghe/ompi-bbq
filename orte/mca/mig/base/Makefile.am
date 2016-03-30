@@ -17,6 +17,6 @@ libmca_mig_la_SOURCES += \
         base/mig_base_frame.c \
 	base/mig_base.c
 
-libmca_mig_la_LIBADD = -ltar
+#libmca_mig_la_LIBADD = -ltar
 
 #endif
