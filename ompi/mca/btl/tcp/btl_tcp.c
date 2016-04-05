@@ -123,30 +123,43 @@ int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
     
     mca_btl_base_endpoint_t *endpoint, *next;
     mca_btl_tcp_module_t *tcp_btl = (mca_btl_tcp_module_t *)btl;
-    char *addr;
-    char *tok;
-    int i = 0;
+    struct in_addr address;
+    int i;
     
-    opal_output(0, "%s btl: restoring events...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-    
-    OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
-        if(MCA_BTL_TCP_FREEZED == endpoint->endpoint_state){
-            if(BTL_NOT_MIGRATING_DONE == migration_state){
-                //Change destination address
-                addr = strchr(mig_hostname, '@');
-                tok = strtok(addr,".");
-                while(tok != NULL){
-                    endpoint->endpoint_addr->addr_inet._union_inet.u6_addr32[i] = atoi(tok);
-                    i++;
-                    tok = strtok(addr,".");
+    opal_output(0, "%s btl: restoring endpoints...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    switch(migration_state){
+        case BTL_NOT_MIGRATING_DONE:
+            opal_output(0, "%s btl: not migrating", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            opal_output(0, "%s btl: new address to be set %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), mig_hostname);
+            OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
+                if(MCA_BTL_TCP_FREEZED == endpoint->endpoint_state){
+                    //Change destination address
+                    
+                    i = 0;
+                    inet_aton(strchr(mig_hostname, '@')+1, &address);
+                    
+                    endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet = address;
+                    opal_output(0, "%s btl: new address set: %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), 
+                            inet_ntoa(endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));                    
+                    strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, mig_hostname);
+                    opal_output(0, "%s btl: new hostname set", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),i);
+                    //TODO: QUA
+                    endpoint->endpoint_sd = -1;
+                    endpoint->endpoint_state = MCA_BTL_TCP_CLOSED;
                 }
-                strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, mig_hostname);
-                //TODO: QUA
             }
-            endpoint->endpoint_sd = -1;
-            mca_btl_tcp_endpoint_send(endpoint, NULL);
-        }
+            break;
+        case BTL_MIGRATING_DONE:
+            OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
+                endpoint->endpoint_sd = -1;
+                endpoint->endpoint_state = MCA_BTL_TCP_CLOSED;
+                opal_output(0, "%s btl:endpoint: endpoint thawed", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            }
+            break;
+        default:
+            opal_output(0, "%s btl: invalid migration state while restoring endpoints", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     }
+    
     return OMPI_SUCCESS;
 }
 
@@ -157,7 +170,7 @@ int mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
     opal_output(0, "%s btl: closing sockets...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
     OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
-        if(MCA_BTL_TCP_FREEZED == endpoint->endpoint_state && 0 != close(endpoint->endpoint_sd)){
+        if(0 != close(endpoint->endpoint_sd)){
             opal_output(0, "%s btl: error while closing socket on %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
         }
     }
@@ -532,6 +545,8 @@ int mca_btl_tcp_send( struct mca_btl_base_module_t* btl,
                 endpoint->endpoint_state = MCA_BTL_TCP_FREEZED;
             }
             break;
+        default:
+            ;
     }
     /*
     if(BTL_MIGRATING_PREPARE == migration_state || BTL_NOT_MIGRATING_PREPARE == migration_state){
