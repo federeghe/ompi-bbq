@@ -439,6 +439,7 @@ mca_btl_tcp_endpoint_send_blocking(mca_btl_base_endpoint_t* btl_endpoint,
                 opal_output(0, "%s btl: sent connect ack to %s FAILED WITH ERROR: %d", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
             inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet), opal_socket_errno);
                 btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
+                opal_output(0, "%s btl: ENDPOINT SEND BLOCKING FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 mca_btl_tcp_endpoint_close(btl_endpoint);
                 return -1;
             }
@@ -527,14 +528,18 @@ static void *mca_btl_tcp_endpoint_complete_accept(int fd, int flags, void *conte
                 inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));
             
             MCA_BTL_TCP_ENDPOINT_DUMP(1, btl_endpoint, true, " [endpoint_accept]");
+            opal_output(0, "%s btl: ENDPOINT COMPLETE ACCEPT FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
             mca_btl_tcp_endpoint_close(btl_endpoint);
             goto unlock_and_return;
         }
-        if(BTL_MIGRATING_DONE != migration_state && BTL_NOT_MIGRATING_DONE != migration_state){
-            opal_output(0, "%s btl: ENDPOINT INIT", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-            mca_btl_tcp_endpoint_event_init(btl_endpoint);
-        }
+//        if(BTL_MIGRATING_DONE != migration_state && BTL_NOT_MIGRATING_DONE != migration_state){
+//            opal_output(0, "%s btl: ENDPOINT INIT", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+//            mca_btl_tcp_endpoint_event_init(btl_endpoint);
+//        }
+//        
+        mca_btl_tcp_endpoint_event_init(btl_endpoint);
+        
         opal_output(0, "%s btl: AFTER INIT", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         MCA_BTL_TCP_ENDPOINT_DUMP(10, btl_endpoint, true, "event_add(recv) [endpoint_accept]");
         opal_event_add(&btl_endpoint->endpoint_recv_event, 0);
@@ -674,6 +679,9 @@ static int mca_btl_tcp_endpoint_recv_blocking(mca_btl_base_endpoint_t* btl_endpo
             if(opal_socket_errno != EINTR && opal_socket_errno != EAGAIN && opal_socket_errno != EWOULDBLOCK) {
                 BTL_ERROR(("recv(%d, %lu/%lu) failed: %s (%d)",
                            btl_endpoint->endpoint_sd, cnt, size, strerror(opal_socket_errno), opal_socket_errno));
+
+                opal_output(0, "%s btl: ENDPOINT RECV BLOCKING FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
                 btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
                 mca_btl_tcp_endpoint_close(btl_endpoint);
                 return -1;
@@ -853,6 +861,7 @@ int mca_btl_tcp_endpoint_start_connect(mca_btl_base_endpoint_t* btl_endpoint)
     }
 
     btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
+    opal_output(0, "%s btl: ENDPOINT START CONNECTING FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     mca_btl_tcp_endpoint_close(btl_endpoint);
 
     return OMPI_ERR_UNREACH;
@@ -906,6 +915,7 @@ static void mca_btl_tcp_endpoint_complete_connect(mca_btl_base_endpoint_t* btl_e
         return;
     }
     MCA_BTL_TCP_ENDPOINT_DUMP(1, btl_endpoint, false, " [complete_connect]");
+    opal_output(0, "%s btl: ENDPOINT COMPLETE CONNECT FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
     mca_btl_tcp_endpoint_close(btl_endpoint);
 }
@@ -1059,6 +1069,7 @@ static void mca_btl_tcp_endpoint_recv_handler(int sd, short flags, void* user)
             inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));
         OPAL_THREAD_UNLOCK(&btl_endpoint->endpoint_recv_lock);
         BTL_ERROR(("invalid socket state(%d)", btl_endpoint->endpoint_state));
+        opal_output(0, "%s btl: ENDPOINT RECV HANDLER FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
         mca_btl_tcp_endpoint_close(btl_endpoint);
         break;
@@ -1087,13 +1098,26 @@ void mca_btl_tcp_endpoint_send_handler(int sd, short flags, void* user)
         break;
     case MCA_BTL_TCP_CONNECTED:
         /* complete the current send */
+        
+        opal_output(0, "%s btl:endpoint: send handler called state connected to: %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+            inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));
+        
         while (NULL != btl_endpoint->endpoint_send_frag) {
+            opal_output(0, "%s btl:endpoint: send handler - into the while - to: %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));
+            
             mca_btl_tcp_frag_t* frag = btl_endpoint->endpoint_send_frag;
             int btl_ownership = (frag->base.des_flags & MCA_BTL_DES_FLAGS_BTL_OWNERSHIP);
 
             if(mca_btl_tcp_frag_send(frag, btl_endpoint->endpoint_sd) == false) {
+                opal_output(0, "%s btl:endpoint: send frag false - to: %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                    inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));
                 break;
             }
+            
+            opal_output(0, "%s btl:endpoint: send frag true - to: %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                    inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));
+            
             /* progress any pending sends */
             btl_endpoint->endpoint_send_frag = (mca_btl_tcp_frag_t*)
                 opal_list_remove_first(&btl_endpoint->endpoint_frags);

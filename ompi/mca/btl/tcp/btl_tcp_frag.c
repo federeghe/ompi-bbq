@@ -134,6 +134,7 @@ bool mca_btl_tcp_frag_send(mca_btl_tcp_frag_t* frag, int sd)
                     frag->iov_ptr[0].iov_base, (unsigned long) frag->iov_ptr[0].iov_len,
                     strerror(opal_socket_errno), (unsigned long) frag->iov_cnt));
                 frag->endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
+                opal_output(0, "%s btl: ENDPOINT FRAG SEND FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 mca_btl_tcp_endpoint_close(frag->endpoint);
                 return false;
             default:
@@ -141,6 +142,7 @@ bool mca_btl_tcp_frag_send(mca_btl_tcp_frag_t* frag, int sd)
                            strerror(opal_socket_errno),
                            opal_socket_errno));
                 frag->endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
+                opal_output(0, "%s btl: ENDPOINT FRAG SEND FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 mca_btl_tcp_endpoint_close(frag->endpoint);
                 return false;
             }
@@ -221,6 +223,7 @@ bool mca_btl_tcp_frag_recv(mca_btl_tcp_frag_t* frag, int sd)
             return false;
         }
 #endif
+        opal_output(0, "%s btl: ENDPOINT FRAG RECV FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
 	    mca_btl_tcp_endpoint_close(btl_endpoint);
 	    return false;
@@ -235,6 +238,7 @@ bool mca_btl_tcp_frag_recv(mca_btl_tcp_frag_t* frag, int sd)
                        frag->iov_ptr[0].iov_base, (unsigned long) frag->iov_ptr[0].iov_len,
                        strerror(opal_socket_errno), (unsigned long) frag->iov_cnt));
             btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
+            opal_output(0, "%s btl: ENDPOINT FRAG RECV 2 FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             opal_output(0, "%s btl: closing on my host EFAULT", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 	    mca_btl_tcp_endpoint_close(btl_endpoint);
 	    return false;
@@ -243,6 +247,7 @@ bool mca_btl_tcp_frag_recv(mca_btl_tcp_frag_t* frag, int sd)
                        strerror(opal_socket_errno),
                        opal_socket_errno));
             btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
+            opal_output(0, "%s btl: ENDPOINT FRAG RECV 2 FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             opal_output(0, "%s btl: closing on my host DEF", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 	    mca_btl_tcp_endpoint_close(btl_endpoint);
 	    return false;
