@@ -79,7 +79,6 @@ typedef struct{
     mca_btl_tcp_frag_t* frag;
 }blocked_endpoint;
 
-char mig_hostname[20]; //Source/destination node hostname
 int migration_state = BTL_RUNNING;
 int pending_events = 0;
 opal_event_t send_ev;
@@ -124,36 +123,33 @@ int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
     mca_btl_base_endpoint_t *endpoint, *next;
     mca_btl_tcp_module_t *tcp_btl = (mca_btl_tcp_module_t *)btl;
     struct in_addr address;
-    int i;
+    char *hostname;
     
-    opal_output(0, "%s btl: restoring endpoints...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    //opal_output(0, "%s btl: restoring endpoints...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     switch(migration_state){
         case BTL_NOT_MIGRATING_DONE:
-            opal_output(0, "%s btl: not migrating", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-            opal_output(0, "%s btl: new address to be set %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), mig_hostname);
+            hostname = strchr(btl_mig_dst, '@')+1;
+            inet_aton(hostname, &address);
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
                 if(MCA_BTL_TCP_FREEZED == endpoint->endpoint_state){
                     //Change destination address
-                    
-                    i = 0;
-                    inet_aton(strchr(mig_hostname, '@')+1, &address);
-                    
-                    endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet = address;
-                    opal_output(0, "%s btl: new address set: %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), 
-                            inet_ntoa(endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));                    
-                    strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, mig_hostname);
-                    opal_output(0, "%s btl: new hostname set", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),i);
-                    //TODO: QUA
-                    endpoint->endpoint_sd = -1;
-                    endpoint->endpoint_state = MCA_BTL_TCP_CLOSED;
+                    endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet = address;                    
+                    strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, btl_mig_dst);
+                    //mca_btl_tcp_endpoint_start_connect(endpoint);
+                    //opal_output(0, "%s btl:endpoint: endpoint thawed", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 }
             }
             break;
         case BTL_MIGRATING_DONE:
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
-                endpoint->endpoint_sd = -1;
-                endpoint->endpoint_state = MCA_BTL_TCP_CLOSED;
-                opal_output(0, "%s btl:endpoint: endpoint thawed", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                hostname = strchr(btl_mig_dst, '@')+1;
+                if(0 == strcmp(strchr(btl_mig_src, '@')+1, inet_ntoa(endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet))){
+                    inet_aton(hostname, &address);  
+                    endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet = address;
+                    strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, hostname);
+                }
+                mca_btl_tcp_endpoint_start_connect(endpoint);
+                //opal_output(0, "%s btl:endpoint: endpoint thawed", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             }
             break;
         default:
@@ -169,33 +165,51 @@ int mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
     
     opal_output(0, "%s btl: closing sockets...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
-    OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
-        if(0 != close(endpoint->endpoint_sd)){
-            opal_output(0, "%s btl: error while closing socket on %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
+        switch(migration_state){
+            case BTL_MIGRATING_EXEC:
+                OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
+                    if(0 != close(endpoint->endpoint_sd)){
+                        opal_output(0, "%s btl: error while closing socket on %s", 
+                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
+                    }
+                    opal_output(0, "%s btl: deleting events...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                    opal_event_del(&endpoint->endpoint_recv_event);
+                    opal_event_del(&endpoint->endpoint_send_event);
+                    endpoint->endpoint_state = MCA_BTL_TCP_FREEZED;
+                    endpoint->endpoint_sd = -1;
+                }
+                break;
+            case BTL_NOT_MIGRATING_EXEC:
+                OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
+                    opal_output(0, "%s btl: cycle", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                    if(0 == strcmp(strchr(btl_mig_src, '@')+1, 
+                        inet_ntoa(endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet))){
+                        opal_output(0, "%s btl: deleting events...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                        opal_event_del(&endpoint->endpoint_recv_event);
+                        opal_event_del(&endpoint->endpoint_send_event);
+                        endpoint->endpoint_state = MCA_BTL_TCP_FREEZED;
+                        endpoint->endpoint_sd = -1;
+                    }
+                }
+                break;
+            default:
+                ;
         }
-    }
 }
 
 int mca_btl_tcp_mig_event(int event, void *data){    
     migration_state = event;
     switch(migration_state){
         case BTL_MIGRATING_PREPARE:
-            if(0 == pending_events){
-                kill(getppid(), SIGUSR1);
-            }
-            break;
         case BTL_NOT_MIGRATING_PREPARE:
-            strcpy(mig_hostname,(const char *)data);
+            opal_output(0, "%s btl: migration data: src - %s, dst - %s", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),btl_mig_src, btl_mig_dst);
             if(0 == pending_events){
                 kill(getppid(), SIGUSR1); //TODO: do we need control over pending_events?
             }
             break;
         case BTL_MIGRATING_EXEC:
-            mca_btl_tcp_mig_close_sockets((mca_btl_base_module_t *) data);
-            kill(getppid(), SIGUSR1);
-            break;
         case BTL_NOT_MIGRATING_EXEC:
-            strcpy(mig_hostname,(const char *)data);
+            mca_btl_tcp_mig_close_sockets((mca_btl_base_module_t *) data);
             kill(getppid(), SIGUSR1);
             break;
         case BTL_NOT_MIGRATING_DONE:
@@ -538,11 +552,13 @@ int mca_btl_tcp_send( struct mca_btl_base_module_t* btl,
         case BTL_MIGRATING_PREPARE:
         case BTL_MIGRATING_EXEC:
             endpoint->endpoint_state = MCA_BTL_TCP_FREEZED;
+            opal_output(0, "%s btl:endpoint: send attempt, endpoint freezed", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             break;
         case BTL_NOT_MIGRATING_PREPARE:
         case BTL_NOT_MIGRATING_EXEC:
-            if (strcmp(endpoint->endpoint_proc->proc_ompi->proc_hostname, mig_hostname)){
+            if (strcmp(endpoint->endpoint_proc->proc_ompi->proc_hostname, btl_mig_src)){
                 endpoint->endpoint_state = MCA_BTL_TCP_FREEZED;
+                opal_output(0, "%s btl:endpoint: send attempt, endpoint freezed", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             }
             break;
         default:

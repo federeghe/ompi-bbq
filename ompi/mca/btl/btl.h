@@ -222,6 +222,10 @@ typedef uint8_t mca_btl_base_tag_t;
 #define BTL_MIGRATING_DONE          4
 #define BTL_NOT_MIGRATING_DONE      5
 #define BTL_RUNNING                 6
+
+extern char btl_mig_src[30];
+extern char btl_mig_dst[30];
+
 #endif
 
 /**

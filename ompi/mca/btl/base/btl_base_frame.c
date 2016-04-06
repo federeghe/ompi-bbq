@@ -82,6 +82,8 @@ bool mca_btl_base_thread_multiple_override = false;
 #if ORTE_ENABLE_MIGRATION
 
 sighandler_t prev_handler;
+char btl_mig_dst[30];
+char btl_mig_src[30];
 
 // Orted signal to freeze btl connections
 static void orted_btl_freeze_sig(int sig) {
@@ -90,8 +92,6 @@ static void orted_btl_freeze_sig(int sig) {
     char filename[40];
     static uint32_t src_jobid;
     static uint32_t src_vpid;
-    static char dst[30];
-    static char src[30];
     mca_btl_base_selected_module_t *sm, *next;
 
     fprintf(stdout, "!!!!!!!!! EHI HERE SIGHANDLER.\n");
@@ -112,7 +112,7 @@ static void orted_btl_freeze_sig(int sig) {
                 return;
             }
 
-            fscanf(mig_info_f,"%u %u %s %s",&src_jobid,&src_vpid,src,dst);
+            fscanf(mig_info_f,"%u %u %s %s",&src_jobid,&src_vpid,btl_mig_src,btl_mig_dst);
 
             fclose(mig_info_f);
             
@@ -123,16 +123,16 @@ static void orted_btl_freeze_sig(int sig) {
             }
 
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
-                    sm->btl_module->btl_mig_event(mig_state, src);
+                    sm->btl_module->btl_mig_event(mig_state, NULL);
             }
             break;
         case BTL_MIGRATING_PREPARE:
-            fprintf(stdout, "!!!!!!!!! BTL_MIGRATING_PREPARE.\n");
+            fprintf(stdout, "!!!!!!!!! BTL_MIGRATING_EXEC.\n");
             fflush(stdout);
 
             mig_state = BTL_MIGRATING_EXEC;
 
-            orte_oob_base_mig_event(ORTE_MIG_EXEC, dst);
+            orte_oob_base_mig_event(ORTE_MIG_EXEC, btl_mig_dst);
 
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
                     sm->btl_module->btl_mig_event(mig_state, sm->btl_module); 
@@ -142,11 +142,11 @@ static void orted_btl_freeze_sig(int sig) {
             mig_state = BTL_NOT_MIGRATING_EXEC;
 
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
-                    sm->btl_module->btl_mig_event(mig_state, dst); 
+                    sm->btl_module->btl_mig_event(mig_state, sm->btl_module); 
             }
             break;
         case BTL_MIGRATING_EXEC:
-            fprintf(stdout, "!!!!!!!!! BTL_MIGRATING_EXEC.\n");
+            fprintf(stdout, "!!!!!!!!! BTL_MIGRATING_DONE.\n");
             fflush(stdout);
 
             mig_state = BTL_MIGRATING_DONE;
