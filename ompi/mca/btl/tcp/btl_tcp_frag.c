@@ -218,8 +218,8 @@ bool mca_btl_tcp_frag_recv(mca_btl_tcp_frag_t* frag, int sd)
 	if( 0 < cnt ) goto advance_iov_position;
 	if( cnt == 0 ) {
 #if ORTE_ENABLE_MIGRATION
-        if(BTL_NOT_MIGRATING_EXEC == migration_state || BTL_NOT_MIGRATING_PREPARE == migration_state){
-            btl_endpoint->endpoint_state = MCA_BTL_TCP_FREEZED;
+        if(btl_endpoint->endpoint_state == MCA_BTL_TCP_FROZEN){
+            opal_output(0, "%s btl: PEER CLOSED SOCKET - EXPECTED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             return false;
         }
 #endif

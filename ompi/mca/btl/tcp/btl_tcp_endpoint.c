@@ -393,7 +393,7 @@ int mca_btl_tcp_endpoint_send(mca_btl_base_endpoint_t* btl_endpoint, mca_btl_tcp
         }
         break;
 #if ORTE_ENABLE_MIGRATION
-    case MCA_BTL_TCP_FREEZED:
+    case MCA_BTL_TCP_FROZEN:
         opal_list_append(&btl_endpoint->endpoint_frags, (opal_list_item_t*) frag);
         frag->base.des_flags |= MCA_BTL_DES_SEND_ALWAYS_CALLBACK;
         opal_output(0, "%s btl:endpoint: frag appended", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
@@ -711,6 +711,11 @@ static int mca_btl_tcp_endpoint_recv_connect_ack(mca_btl_base_endpoint_t* btl_en
 
     s = mca_btl_tcp_endpoint_recv_blocking(btl_endpoint,
                                            &guid, sizeof(ompi_process_name_t));
+    
+    //TODO: DEBUG
+    opal_output(0, "%s btl: recv connect ack from %s - AFTER RECV BLOCKING", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+            inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));
+    
     if (s != sizeof(ompi_process_name_t)) {
         if (0 == s) {
             /* If we get zero bytes, the peer closed the socket. This
@@ -961,14 +966,8 @@ static void mca_btl_tcp_endpoint_recv_handler(int sd, short flags, void* user)
      * will be eventually triggered again shorthly.
      */
     
-    opal_output(0, "%s btl: received data from %s, before lock", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
-            inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));
-    
     if( OPAL_THREAD_TRYLOCK(&btl_endpoint->endpoint_recv_lock) )
         return;
-    
-    opal_output(0, "%s btl: received data from %s, after lock", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
-            inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));
     
     opal_output(0, "%s btl: received data from %s, inside if, sd: %d, sd_next: %d, sd local: %d", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
             inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet),
@@ -1058,8 +1057,8 @@ static void mca_btl_tcp_endpoint_recv_handler(int sd, short flags, void* user)
         OPAL_THREAD_UNLOCK(&btl_endpoint->endpoint_recv_lock);
         break;
 #if ORTE_ENABLE_MIGRATION
-    case MCA_BTL_TCP_FREEZED:
-        opal_output(0, "%s btl:endpoint: endpoint freezed, deleting recive event", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    case MCA_BTL_TCP_FROZEN:
+        opal_output(0, "%s btl:endpoint: endpoint frozen, deleting recive event", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         opal_event_del(&btl_endpoint->endpoint_recv_event);
         OPAL_THREAD_UNLOCK(&btl_endpoint->endpoint_recv_lock);
         break;

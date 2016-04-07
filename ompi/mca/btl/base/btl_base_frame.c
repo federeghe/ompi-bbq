@@ -93,9 +93,6 @@ static void orted_btl_freeze_sig(int sig) {
     static uint32_t src_jobid;
     static uint32_t src_vpid;
     mca_btl_base_selected_module_t *sm, *next;
-
-    fprintf(stdout, "!!!!!!!!! EHI HERE SIGHANDLER.\n");
-
     
     if (OPAL_UNLIKELY(sig != SIGUSR1)) {
         // ???
@@ -123,13 +120,10 @@ static void orted_btl_freeze_sig(int sig) {
             }
 
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
-                    sm->btl_module->btl_mig_event(mig_state, NULL);
+                    sm->btl_module->btl_mig_event(mig_state, sm->btl_module);
             }
             break;
         case BTL_MIGRATING_PREPARE:
-            fprintf(stdout, "!!!!!!!!! BTL_MIGRATING_EXEC.\n");
-            fflush(stdout);
-
             mig_state = BTL_MIGRATING_EXEC;
 
             orte_oob_base_mig_event(ORTE_MIG_EXEC, btl_mig_dst);
@@ -146,9 +140,6 @@ static void orted_btl_freeze_sig(int sig) {
             }
             break;
         case BTL_MIGRATING_EXEC:
-            fprintf(stdout, "!!!!!!!!! BTL_MIGRATING_DONE.\n");
-            fflush(stdout);
-
             mig_state = BTL_MIGRATING_DONE;
 
             orte_oob_base_mig_event(ORTE_MIG_DONE, NULL);
@@ -168,7 +159,6 @@ static void orted_btl_freeze_sig(int sig) {
         default:
             ;
     }
-
 }
 #endif
 
