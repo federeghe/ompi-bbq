@@ -187,6 +187,8 @@ int mca_btl_tcp_mig_event(int event, void *data){
         case BTL_MIGRATING_PREPARE:
         case BTL_NOT_MIGRATING_PREPARE:
             mca_btl_tcp_freeze_endpoints((mca_btl_base_module_t *) data);
+            opal_output(0, "------------------> %s SEGNALO IL PADRE CAZZO", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
             kill(getppid(), SIGUSR1);
             break;
         case BTL_MIGRATING_EXEC:
@@ -197,6 +199,10 @@ int mca_btl_tcp_mig_event(int event, void *data){
         case BTL_NOT_MIGRATING_DONE:
         case BTL_MIGRATING_DONE:
             mca_btl_tcp_mig_restore((mca_btl_base_module_t *) data);
+
+            // In this case we can reset the migration status variable
+            // to running (the migration has ended)
+            migration_state = BTL_RUNNING;
             break;
         default:
             break;

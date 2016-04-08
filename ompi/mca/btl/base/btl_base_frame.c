@@ -140,6 +140,7 @@ static void orted_btl_freeze_sig(int sig) {
             }
             break;
         case BTL_MIGRATING_EXEC:
+            opal_output(0,"FROM BTL_MIGRATING_EXEC TO BTL_MIGRATING_DONE");
             mig_state = BTL_MIGRATING_DONE;
 
             // Redo the inizilization of opal_output in order to change
@@ -151,13 +152,18 @@ static void orted_btl_freeze_sig(int sig) {
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
                     sm->btl_module->btl_mig_event(mig_state, sm->btl_module);
             }
+
+            opal_output(0,"FROM BTL_MIGRATING_DONE TO BTL_RUNNING");
             mig_state = BTL_RUNNING;
             break;
         case BTL_NOT_MIGRATING_EXEC:
+            opal_output(0,"FROM BTL_NOT_MIGRATING_EXEC TO BTL_NOT_MIGRATING_DONE");
             mig_state = BTL_NOT_MIGRATING_DONE;
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
                     sm->btl_module->btl_mig_event(mig_state, sm->btl_module);
             }
+
+            opal_output(0,"FROM BTL_NOT_MIGRATING_DONE TO BTL_RUNNING");
             mig_state = BTL_RUNNING;
             break;
         default:

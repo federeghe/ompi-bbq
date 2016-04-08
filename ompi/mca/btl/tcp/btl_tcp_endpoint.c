@@ -995,9 +995,7 @@ static void mca_btl_tcp_endpoint_recv_handler(int sd, short flags, void* user)
         {
             opal_output(0, "%s btl: received data from %s, connected", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
                 inet_ntoa(btl_endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet));
-            
-            sleep(1);
-            
+
             mca_btl_tcp_frag_t* frag;
 
             frag = btl_endpoint->endpoint_recv_frag;
@@ -1058,7 +1056,7 @@ static void mca_btl_tcp_endpoint_recv_handler(int sd, short flags, void* user)
         break;
 #if ORTE_ENABLE_MIGRATION
     case MCA_BTL_TCP_FROZEN:
-        opal_output(0, "%s btl:endpoint: endpoint frozen, deleting recive event", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        opal_output(0, "%s btl:endpoint: endpoint frozen, deleting receive event", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
         opal_event_del(&btl_endpoint->endpoint_recv_event);
         OPAL_THREAD_UNLOCK(&btl_endpoint->endpoint_recv_lock);
         break;

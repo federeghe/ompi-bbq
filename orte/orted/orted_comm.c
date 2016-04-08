@@ -1188,6 +1188,9 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         if(!found){
             //No children, send ack immediately
+            opal_output(0, "%s orted_cmd: No children, send ack immediately",
+                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            //No children, send ack immediately
             SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
         }else{
             /* Now I send the signal to all children to let them know that
@@ -1217,6 +1220,9 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         if(!found){
             //No children, send ack immediately
+            opal_output(0, "%s orted_cmd: No children, send ack immediately",
+                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
             SEND_MIG_ACK(ORTE_MIG_READY_FLAG);
         }else{
             /* Now I send the signal to all children to let them know that

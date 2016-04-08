@@ -193,7 +193,7 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
     char *cmd;
-    asprintf(&cmd, "tar -P -czf %s %s", TO_SEND_FILE, path);
+    asprintf(&cmd, "tar -P -cf %s %s", TO_SEND_FILE, path);
     system(cmd);
     free(cmd);
 
@@ -331,7 +331,7 @@ int orte_mig_base_restore(char *path) {
     
     char *cmd;
     mkdir(path,0700);
-    asprintf(&cmd, "tar -P -xzf %s -C %s --strip-components=2", TO_UNTAR_FILE, path);
+    asprintf(&cmd, "tar -P -xf %s -C %s --strip-components=2", TO_UNTAR_FILE, path);
     system(cmd);
     free(cmd);
 
