@@ -97,14 +97,16 @@ int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
             break;
         case BTL_MIGRATING_DONE:
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
-                hostname = strchr(btl_mig_dst, '@')+1;
-                if(0 == strcmp(strchr(btl_mig_src, '@')+1, inet_ntoa(endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet))){
-                    inet_aton(hostname, &address);  
-                    endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet = address;
-                    strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, hostname);
+                if(MCA_BTL_TCP_FROZEN == endpoint->endpoint_state){
+                    hostname = strchr(btl_mig_dst, '@')+1;
+                    if(0 == strcmp(strchr(btl_mig_src, '@')+1, inet_ntoa(endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet))){
+                        inet_aton(hostname, &address);  
+                        endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet = address;
+                        strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, hostname);
+                    }
+                    mca_btl_tcp_endpoint_start_connect(endpoint);
+                    //opal_output(0, "%s btl:endpoint: endpoint thawed", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 }
-                mca_btl_tcp_endpoint_start_connect(endpoint);
-                //opal_output(0, "%s btl:endpoint: endpoint thawed", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             }
             break;
         default:
@@ -152,7 +154,7 @@ int mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
         }
 }
 
-int mca_btl_freeze_endpoints(mca_btl_base_module_t* btl){
+int mca_btl_tcp_freeze_endpoints(mca_btl_base_module_t* btl){
     mca_btl_base_endpoint_t *endpoint, *next;
     mca_btl_tcp_module_t *tcp_btl = (mca_btl_tcp_module_t *)btl;
     
@@ -161,7 +163,8 @@ int mca_btl_freeze_endpoints(mca_btl_base_module_t* btl){
     switch(migration_state){
         case BTL_MIGRATING_PREPARE:
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
-                endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
+                if(MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state)
+                    endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
             }
             break;
         case BTL_NOT_MIGRATING_PREPARE:
@@ -182,7 +185,7 @@ int mca_btl_tcp_mig_event(int event, void *data){
     switch(migration_state){
         case BTL_MIGRATING_PREPARE:
         case BTL_NOT_MIGRATING_PREPARE:
-            mca_btl_freeze_endpoints((mca_btl_base_module_t *) data);
+            mca_btl_tcp_freeze_endpoints((mca_btl_base_module_t *) data);
             kill(getppid(), SIGUSR1);
             break;
         case BTL_MIGRATING_EXEC:
