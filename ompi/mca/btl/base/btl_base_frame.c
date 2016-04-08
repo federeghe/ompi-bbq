@@ -142,6 +142,10 @@ static void orted_btl_freeze_sig(int sig) {
         case BTL_MIGRATING_EXEC:
             mig_state = BTL_MIGRATING_DONE;
 
+            // Redo the inizilization of opal_output in order to change
+            // the hostname printed for debugging purpose
+            opal_output_renew_hostname();
+
             orte_oob_base_mig_event(ORTE_MIG_DONE, NULL);
 
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {

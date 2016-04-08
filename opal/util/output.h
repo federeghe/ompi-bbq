@@ -267,6 +267,12 @@ struct opal_output_stream_t {
     OPAL_DECLSPEC bool opal_output_init(void);
     
     /**
+     * Change the hostname previously saved
+     * TODO
+     */
+    OPAL_DECLSPEC void opal_output_renew_hostname(void);
+
+    /**
      * Shut down the output stream system.
      *
      * Shut down the output stream system, including the default verbose

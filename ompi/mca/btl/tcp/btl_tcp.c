@@ -92,6 +92,7 @@ int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
                     //Change destination address
                     endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet = address;                    
                     strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, btl_mig_dst);
+                    endpoint->endpoint_state = MCA_BTL_TCP_CLOSED;
                 }
             }
             break;

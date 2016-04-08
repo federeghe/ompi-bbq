@@ -213,6 +213,17 @@ bool opal_output_init(void)
     return true;
 }
 
+void opal_output_renew_hostname(void) {
+    char hostname[32];
+
+    gethostname(hostname, sizeof(hostname));
+    hostname[sizeof(hostname)-1] = '\0';
+    OPAL_THREAD_LOCK(&mutex);
+    verbose.lds_prefix = realloc(verbose.lds_prefix, strlen(hostname) + 10 /* 4 chars + 5 pid + NULL */);
+    sprintf(verbose.lds_prefix, "[%s:%05d] ", hostname, getpid());
+    OPAL_THREAD_UNLOCK(&mutex);
+
+}
 
 /*
  * Open a stream

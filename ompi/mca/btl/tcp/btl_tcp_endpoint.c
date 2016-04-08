@@ -1143,6 +1143,7 @@ void mca_btl_tcp_endpoint_send_handler(int sd, short flags, void* user)
         }
         break;
     case MCA_BTL_TCP_CONNECT_ACK:
+    case MCA_BTL_TCP_FROZEN:
             break;    
     default:
         BTL_ERROR(("invalid connection state (%d)", btl_endpoint->endpoint_state));

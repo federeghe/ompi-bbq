@@ -147,6 +147,8 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
 
 #if ORTE_ENABLE_MIGRATION
     static int ack_count = 0;
+    int total=0;
+    orte_node_t* nptr;
 #endif
 
     OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
@@ -417,7 +419,18 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
         switch(flag){
         /* Messages sent from daemons telling us they're aware of the imminent migration */
         case ORTE_MIG_PREPARE_ACK_FLAG:
-            if (orte_node_pool->size - orte_node_pool->number_free == ++ack_count){
+
+            ++ack_count;
+            total=0;
+            for (i=0; i < orte_node_pool->size; i++) {
+                if (NULL == (nptr = (orte_node_t*)opal_pointer_array_get_item(orte_node_pool, i))) {
+                    continue;
+                }
+                if (nptr->daemon_launched)
+                    total++;
+            }
+
+            if (total == ++ack_count){
                 opal_output_verbose(5, orte_plm_base_framework.framework_output,
                                                 "%s plm:base:receive all prepare migration ack received",
                                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
@@ -429,8 +442,18 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
         
         /* Daemon is ready to migrate */
         case ORTE_MIG_READY_FLAG:
-            if (orte_node_pool->size - orte_node_pool->number_free == ++ack_count){
-                opal_output_verbose(5, orte_plm_base_framework.framework_output,
+
+            ++ack_count;
+            total=0;
+            for (i=0; i < orte_node_pool->size; i++) {
+                if (NULL == (nptr = (orte_node_t*)opal_pointer_array_get_item(orte_node_pool, i))) {
+                    continue;
+                }
+                if (nptr->daemon_launched)
+                    total++;
+            }
+
+            if (total == ++ack_count){                opal_output_verbose(5, orte_plm_base_framework.framework_output,
                                                 "%s plm:base:receive all exec migration ack received",
                                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 orte_mig_base.active_module->fwd_info(flag);
