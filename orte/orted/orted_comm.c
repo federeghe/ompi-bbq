@@ -129,7 +129,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     orte_job_t *jdata;
     orte_process_name_t proc, proc2;
     orte_process_name_t *return_addr;
-    int32_t i, num_replies;
+    int32_t i, num_replies, num_children;
     bool hnp_accounted_for;
     opal_pointer_array_t procarray;
     orte_proc_t *proct;
@@ -1177,9 +1177,17 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         prev_handler = signal(SIGUSR1, orted_mig_child_ack_sig);
 
+        found=false;
+        for (i=0; i < orte_local_children->size; i++) {
+            if (NULL == opal_pointer_array_get_item(orte_local_children, i)) {
+                continue;
+            }
+            found=true;
+            break;
+        }
 
-        if(ORTE_PROC_IS_HNP){
-            //I'm the HNP, send ack immediately
+        if(!found){
+            //No children, send ack immediately
             SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
         }else{
             /* Now I send the signal to all children to let them know that
@@ -1197,8 +1205,18 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         mig_status = ORTE_DAEMON_MIG_EXEC;   // Abuse of constant
         
-        if(ORTE_PROC_IS_HNP){
-            //I'm the HNP, send ack immediately
+
+        found=false;
+        for (i=0; i < orte_local_children->size; i++) {
+            if (NULL == opal_pointer_array_get_item(orte_local_children, i)) {
+                continue;
+            }
+            found=true;
+            break;
+        }
+
+        if(!found){
+            //No children, send ack immediately
             SEND_MIG_ACK(ORTE_MIG_READY_FLAG);
         }else{
             /* Now I send the signal to all children to let them know that
@@ -1273,7 +1291,7 @@ static void orted_mig_child_ack_sig(int sig) {
     
     opal_output(0, "%s orted: received ack from a child.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
-    static unsigned int received=0;
+    static int received=0;
     if (++received == orte_local_children->size) {
 
         // Restore the original signal handler for USR1

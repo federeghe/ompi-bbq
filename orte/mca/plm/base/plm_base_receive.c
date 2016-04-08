@@ -423,14 +423,17 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
             ++ack_count;
             total=0;
             for (i=0; i < orte_node_pool->size; i++) {
+
                 if (NULL == (nptr = (orte_node_t*)opal_pointer_array_get_item(orte_node_pool, i))) {
                     continue;
                 }
-                if (nptr->daemon_launched)
+                if (nptr->daemon != NULL && nptr->daemon_launched && nptr->state == ORTE_NODE_STATE_UP)
                     total++;
             }
+            opal_output(5, "******************* total %i, ack_count %i", total, ack_count);
 
-            if (total == ++ack_count){
+            if (total == ack_count){
+
                 opal_output_verbose(5, orte_plm_base_framework.framework_output,
                                                 "%s plm:base:receive all prepare migration ack received",
                                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
@@ -449,11 +452,14 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
                 if (NULL == (nptr = (orte_node_t*)opal_pointer_array_get_item(orte_node_pool, i))) {
                     continue;
                 }
-                if (nptr->daemon_launched)
+                if (nptr->daemon != NULL && nptr->daemon_launched && nptr->slots_inuse > 0)
                     total++;
             }
+            opal_output(5, "++++++++++++++++ total %i, ack_count %i", total, ack_count);
 
-            if (total == ++ack_count){                opal_output_verbose(5, orte_plm_base_framework.framework_output,
+            if (total == ack_count){
+
+                opal_output_verbose(5, orte_plm_base_framework.framework_output,
                                                 "%s plm:base:receive all exec migration ack received",
                                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 orte_mig_base.active_module->fwd_info(flag);

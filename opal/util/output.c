@@ -215,14 +215,27 @@ bool opal_output_init(void)
 
 void opal_output_renew_hostname(void) {
     char hostname[32];
+    int i;
 
     gethostname(hostname, sizeof(hostname));
     hostname[sizeof(hostname)-1] = '\0';
     OPAL_THREAD_LOCK(&mutex);
-    verbose.lds_prefix = realloc(verbose.lds_prefix, strlen(hostname) + 10 /* 4 chars + 5 pid + NULL */);
-    sprintf(verbose.lds_prefix, "[%s:%05d] ", hostname, getpid());
-    OPAL_THREAD_UNLOCK(&mutex);
+    char *log_prefix = malloc(strlen(hostname) + 10 /* 4 chars + 5 pid + NULL */);
+    sprintf(log_prefix, "[%s:%05d] ", hostname, getpid());
 
+    for (i = 0; i < OPAL_OUTPUT_MAX_STREAMS; ++i) {
+        if (!info[i].ldi_used) {
+            continue;
+        }
+
+        if (info[i].ldi_prefix != NULL) {
+            free(info[i].ldi_prefix);
+        }
+        info[i].ldi_prefix = strdup(log_prefix);
+        info[i].ldi_prefix_len = strlen(log_prefix);
+    }
+    OPAL_THREAD_UNLOCK(&mutex);
+    free(log_prefix);
 }
 
 /*
