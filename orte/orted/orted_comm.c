@@ -1234,7 +1234,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
             SEND_MIG_ACK(ORTE_MIG_READY_FLAG);
         }else{
-            prev_handler = signal(SIGUSR1, orted_mig_child_ack_sig);
+            //prev_handler = signal(SIGUSR1, orted_mig_child_ack_sig);
 
             /* Now I send the signal to all children to let them know that
              * they must read the file. They will signal me back later.

@@ -452,7 +452,7 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
                 if (NULL == (nptr = (orte_node_t*)opal_pointer_array_get_item(orte_node_pool, i))) {
                     continue;
                 }
-                if (nptr->daemon != NULL && nptr->daemon_launched && nptr->slots_inuse > 0)
+                if (nptr->daemon != NULL && nptr->daemon_launched && nptr->state == ORTE_NODE_STATE_UP)
                     total++;
             }
             opal_output(5, "++++++++++++++++ total %i, ack_count %i", total, ack_count);
