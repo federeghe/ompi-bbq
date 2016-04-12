@@ -597,6 +597,25 @@ int mca_btl_tcp_put( mca_btl_base_module_t* btl,
     frag->hdr.count = frag->base.des_dst_cnt;
     if (endpoint->endpoint_nbo) MCA_BTL_TCP_HDR_HTON(frag->hdr);
     
+#if ORTE_ENABLE_MIGRATION
+    switch(migration_state){
+        case BTL_MIGRATING_PREPARE:
+        case BTL_MIGRATING_EXEC:
+            endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
+            opal_output(0, "%s btl:endpoint: send attempt, endpoint frozen", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            break;
+        case BTL_NOT_MIGRATING_PREPARE:
+        case BTL_NOT_MIGRATING_EXEC:
+            if (strcmp(endpoint->endpoint_proc->proc_ompi->proc_hostname, btl_mig_src)){
+                endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
+                opal_output(0, "%s btl:endpoint: send attempt, endpoint frozen", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            }
+            break;
+        default:
+            ;
+    }
+#else
+    
     return ((i = mca_btl_tcp_endpoint_send(endpoint,frag)) >= 0 ? OMPI_SUCCESS : i);
 }
 
@@ -634,6 +653,25 @@ int mca_btl_tcp_get(
     frag->hdr.type = MCA_BTL_TCP_HDR_TYPE_GET;
     frag->hdr.count = frag->base.des_src_cnt;
     if (endpoint->endpoint_nbo) MCA_BTL_TCP_HDR_HTON(frag->hdr);
+
+#if ORTE_ENABLE_MIGRATION
+    switch(migration_state){
+        case BTL_MIGRATING_PREPARE:
+        case BTL_MIGRATING_EXEC:
+            endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
+            opal_output(0, "%s btl:endpoint: send attempt, endpoint frozen", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            break;
+        case BTL_NOT_MIGRATING_PREPARE:
+        case BTL_NOT_MIGRATING_EXEC:
+            if (strcmp(endpoint->endpoint_proc->proc_ompi->proc_hostname, btl_mig_src)){
+                endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
+                opal_output(0, "%s btl:endpoint: send attempt, endpoint frozen", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            }
+            break;
+        default:
+            ;
+    }
+#else
     return ((rc = mca_btl_tcp_endpoint_send(endpoint,frag)) >= 0 ? OMPI_SUCCESS : rc);
 }
 
