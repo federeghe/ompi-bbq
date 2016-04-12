@@ -131,8 +131,10 @@ int mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
                     }
                     opal_output(0, "%s btl: deleting events...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-                    opal_event_del(&endpoint->endpoint_recv_event);
-                    opal_event_del(&endpoint->endpoint_send_event);
+                    if (endpoint->endpoint_recv_event.ev_base != NULL)
+                        opal_event_del(&endpoint->endpoint_recv_event);
+                    if (endpoint->endpoint_send_event.ev_base != NULL)
+                        opal_event_del(&endpoint->endpoint_send_event);
                     endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
                     endpoint->endpoint_sd = -1;
                 }
@@ -143,8 +145,10 @@ int mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
                     if(0 == strcmp(strchr(btl_mig_src, '@')+1, 
                         inet_ntoa(endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet))){
                         opal_output(0, "%s btl: deleting events...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-                        opal_event_del(&endpoint->endpoint_recv_event);
-                        opal_event_del(&endpoint->endpoint_send_event);
+                        if (endpoint->endpoint_recv_event.ev_base != NULL)
+                            opal_event_del(&endpoint->endpoint_recv_event);
+                        if (endpoint->endpoint_send_event.ev_base != NULL)
+                            opal_event_del(&endpoint->endpoint_send_event);
                         endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
                         endpoint->endpoint_sd = -1;
                     }
