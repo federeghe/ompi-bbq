@@ -274,6 +274,14 @@ int orte_mig_base_restore(char *path) {
     addr.sin_addr.s_addr = htonl(INADDR_ANY);   // Maybe in future we can restrict to source node
     addr.sin_port = htons(PORT_MIGRATION_COPY);
     
+    int reuse = 1;
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0) {
+        opal_output_verbose(0, orte_mig_base_framework.framework_output,
+                    "%s orted:mig:base Can't reuse addr.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+
     if(0>bind(socket_fd,(struct sockaddr *)&addr, sizeof(addr)))
     {
         opal_output_verbose(0, orte_mig_base_framework.framework_output,
