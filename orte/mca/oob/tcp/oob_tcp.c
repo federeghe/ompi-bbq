@@ -865,8 +865,13 @@ static void mig_me(bool defreezing) {
 	mca_oob_tcp_peer_t *peer_tmp;
 
 	// Let's freeze all peers
-    opal_output (0, "%s:oob_tcp_mig_event: freezing all peers...\n",
+	if (defreezing) {
+    opal_output (0, "%s:oob_tcp_mig_event: defreezing all peers...\n",
                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+	} else {
+	    opal_output (0, "%s:oob_tcp_mig_event: freezing all peers...\n",
+	            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+	}
 
     if (OPAL_SUCCESS == opal_hash_table_get_first_key_uint64(&mca_oob_tcp_module.peers, &ui64,
                                                              (void**)&peer_tmp, (void**)&nptr)) {

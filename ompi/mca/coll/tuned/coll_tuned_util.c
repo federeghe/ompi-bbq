@@ -64,7 +64,9 @@ int ompi_coll_tuned_sendrecv_nonzero_actual( void* sendbuf, size_t scount,
     }
 
     if (0 != nreqs) {
+        opal_output(0,"ENTRO IN WAIT ALL");
         err = ompi_request_wait_all( nreqs, reqs, statuses );
+        opal_output(0,"E ORA CI ESCO");
         if (err != MPI_SUCCESS) { line = __LINE__; goto error_handler; }
 
         if (MPI_STATUS_IGNORE != status) {
