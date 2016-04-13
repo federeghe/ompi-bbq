@@ -1387,6 +1387,7 @@ void orted_mig_callback(int status, orte_process_name_t *peer,
                     orte_mig_base.active_module->dump(fpid);
                     orte_mig_base.active_module->migrate(mig_dest_host,NULL,fpid);
                     // TODO fault tolerance
+                    kill(fpid, SIGKILL);
                     exit(0);
                 }
             }

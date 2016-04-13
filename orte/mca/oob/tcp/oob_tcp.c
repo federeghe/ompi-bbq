@@ -89,6 +89,7 @@ static void ft_event(int state);
 static void mig_event(int event, void* data);
 static void mig_done(mca_oob_tcp_peer_t* peer, const char *uri_dest, const int port);
 static void mig_me(bool defreezing);
+static void mig_app(const char* src, const char* dst);
 #endif
 
 mca_oob_tcp_module_t mca_oob_tcp_module = {
@@ -740,6 +741,7 @@ static void ft_event(int state) {
 
 #if ORTE_ENABLE_MIGRATION
 bool mca_oob_tcp_migrating_me = false;
+bool mca_oob_tcp_app_mig = false;
 mca_oob_tcp_peer_t* mca_oob_tcp_migrating_peer=NULL;
 #define AM_I_NODE(p) (((orte_process_name_t*)p)->jobid == ORTE_PROC_MY_NAME->jobid \
 					  && ((orte_process_name_t*)p)->vpid == ORTE_PROC_MY_NAME->vpid)
@@ -788,9 +790,8 @@ static void mig_event(int event, void* data) {
             // the signal via btl to migrate. In this case I have to close the sockets
             // between me and the orted.
             mca_oob_tcp_migrating_me=true;
+            mca_oob_tcp_app_mig = true;
             printf ("%s:oob_tcp_mig_event: App migration.\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
-
         }
 
     break;
@@ -827,6 +828,9 @@ static void mig_event(int event, void* data) {
 		// Oh! Wow! I'm the migrating node!
      	mig_me(false);
 
+     	if (mca_oob_tcp_app_mig) {
+     	    mig_app("10.10.1.3", "10.10.1.2");
+     	}
     break;
 
     case ORTE_MIG_DONE:
@@ -854,6 +858,41 @@ static void oob_mig_freeze_defreeze(bool defreezing, mca_oob_tcp_peer_t* peer) {
         peer->state = MCA_OOB_TCP_UNCONNECTED;
         return;
     }
+}
+
+static void mig_app(const char* src, const char* dst) {
+    mca_oob_tcp_peer_t *peer_tmp;
+    mca_oob_tcp_addr_t *addr;
+    uint64_t ui64;
+    char *nptr;
+    struct in_addr address_src, address_dst;
+    inet_aton(src, &address_src);
+    inet_aton(dst, &address_dst);
+
+    if (OPAL_SUCCESS == opal_hash_table_get_first_key_uint64(&mca_oob_tcp_module.peers, &ui64,
+                                                             (void**)&peer_tmp, (void**)&nptr)) {
+        if (NULL != peer_tmp) {
+
+            OPAL_LIST_FOREACH(addr, &peer_tmp->addrs, mca_oob_tcp_addr_t) {
+                struct sockaddr_in * sockin = (struct sockaddr_in *)&addr->addr;
+                if(memcmp(&sockin->sin_addr,&address_src, sizeof(struct in_addr))==0) {
+                    sockin->sin_addr = address_dst;
+                }
+            }
+        }
+        while (OPAL_SUCCESS == opal_hash_table_get_next_key_uint64(&mca_oob_tcp_module.peers, &ui64,
+                                                                   (void**)&peer_tmp, nptr, (void**)&nptr)) {
+            if (NULL != peer_tmp) {
+                OPAL_LIST_FOREACH(addr, &peer_tmp->addrs, mca_oob_tcp_addr_t) {
+                    struct sockaddr_in * sockin = (struct sockaddr_in *)&addr->addr;
+                    if(memcmp(&sockin->sin_addr,&address_src, sizeof(struct in_addr))==0) {
+                        sockin->sin_addr = address_dst;
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 /**

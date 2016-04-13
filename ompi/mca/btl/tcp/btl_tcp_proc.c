@@ -770,6 +770,7 @@ void mca_btl_tcp_proc_accept(mca_btl_tcp_proc_t* btl_proc, struct sockaddr* addr
     }
     OPAL_THREAD_UNLOCK(&btl_proc->proc_lock);
     /* No further use of this socket. Close it */
+    opal_output(0,"mca_btl_tcp_proc_accept");
     CLOSE_THE_SOCKET(sd);
 }
 

@@ -219,13 +219,15 @@ bool mca_btl_tcp_frag_recv(mca_btl_tcp_frag_t* frag, int sd)
 
         if( 0 < cnt )
             goto advance_iov_position;
-        if( cnt == 0 ) {
+
 #if ORTE_ENABLE_MIGRATION
             if(btl_endpoint->endpoint_state == MCA_BTL_TCP_FROZEN){
                 opal_output(0, "%s btl: PEER CLOSED SOCKET - EXPECTED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 return false;
             }
 #endif
+
+        if( cnt == 0 ) {
             opal_output(0, "%s btl: ENDPOINT FRAG RECV FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
             mca_btl_tcp_endpoint_close(btl_endpoint);

@@ -88,8 +88,10 @@ int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
                 if(MCA_BTL_TCP_FROZEN == endpoint->endpoint_state){
                     endpoint->endpoint_state = MCA_BTL_TCP_CLOSED;
-                    mca_btl_tcp_endpoint_start_connect(endpoint);
-                    opal_output(0, "%s btl: reopen connection", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                    if(opal_list_get_size(&endpoint->endpoint_frags) > 0 || endpoint->endpoint_send_frag != NULL) {
+                        mca_btl_tcp_endpoint_start_connect(endpoint);
+                        opal_output(0, "%s btl: reopen connection", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                    }
                 }
             }
             break;
@@ -99,7 +101,11 @@ int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
                 if(MCA_BTL_TCP_FROZEN == endpoint->endpoint_state){
                     endpoint->endpoint_state = MCA_BTL_TCP_CLOSED;
-                    //mca_btl_tcp_endpoint_start_connect(endpoint);
+
+                    if(opal_list_get_size(&endpoint->endpoint_frags) > 0 || endpoint->endpoint_send_frag != NULL) {
+                        mca_btl_tcp_endpoint_start_connect(endpoint);
+                        opal_output(0, "%s btl: reopen connection", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                    }
                 }
 
             }

@@ -130,7 +130,7 @@ BEGIN_C_DECLS
             opal_mutex_lock(mutex);             \
         }                                       \
     } while (0)
-#elif OPAL_ENABLE_DEBUG
+#elif 0 //OPAL_ENABLE_DEBUG
 #define OPAL_THREAD_LOCK(mutex)                                         \
     do {                                                                \
         (mutex)->m_lock_debug++;                                        \
@@ -167,7 +167,7 @@ BEGIN_C_DECLS
 #if OMPI_ENABLE_THREAD_MULTIPLE
 #define OPAL_THREAD_TRYLOCK(mutex)                      \
     (opal_using_threads() ? opal_mutex_trylock(mutex) : 0)
-#elif OPAL_ENABLE_DEBUG
+#elif 0 //OPAL_ENABLE_DEBUG
 static inline int
 opal_thread_debug_trylock(opal_mutex_t *mutex, const char *file, int line)
 {
@@ -215,7 +215,7 @@ opal_thread_debug_trylock(opal_mutex_t *mutex, const char *file, int line)
             opal_mutex_unlock(mutex);           \
         }                                       \
     } while (0)
-#elif OPAL_ENABLE_DEBUG
+#elif 0 //OPAL_ENABLE_DEBUG
 #define OPAL_THREAD_UNLOCK(mutex)                                       \
     do {                                                                \
         (mutex)->m_lock_debug--;                                        \

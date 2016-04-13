@@ -385,6 +385,7 @@ static int mca_btl_tcp_component_open(void)
 
 static int mca_btl_tcp_component_close(void)
 {
+    opal_output(0,"btl:mca_btl_tcp_component_close");
     if (NULL != mca_btl_tcp_component.tcp_if_seq) {
         free(mca_btl_tcp_component.tcp_if_seq);
     }
@@ -1132,6 +1133,7 @@ static void mca_btl_tcp_component_recv_handler(int sd, short flags, void* user)
     /* recv the process identifier */
     retval = recv(sd, (char *)&guid, sizeof(guid), 0);
     if(retval != sizeof(guid)) {
+        opal_output(0,"btl:mca_btl_tcp_component_recv_handler: retval!=guid");
         CLOSE_THE_SOCKET(sd);
         return;
     }
@@ -1152,6 +1154,7 @@ static void mca_btl_tcp_component_recv_handler(int sd, short flags, void* user)
     /* lookup the corresponding process */
     btl_proc = mca_btl_tcp_proc_lookup(&guid);
     if(NULL == btl_proc) {
+        opal_output(0,"btl:mca_btl_tcp_component_recv_handler: btl_proc==NULL");
         CLOSE_THE_SOCKET(sd);
         return;
     }

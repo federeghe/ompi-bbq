@@ -87,6 +87,9 @@ char btl_mig_src[30];
 
 // Orted signal to freeze btl connections
 static void orted_btl_freeze_sig(int sig) {
+
+    opal_output(0, "orted_btl_freeze_sig");
+
     static int mig_state = BTL_RUNNING;
     FILE *mig_info_f;
     char filename[40];
@@ -140,12 +143,13 @@ static void orted_btl_freeze_sig(int sig) {
             }
             break;
         case BTL_MIGRATING_EXEC:
-            opal_output(0,"FROM BTL_MIGRATING_EXEC TO BTL_MIGRATING_DONE");
-            mig_state = BTL_MIGRATING_DONE;
-
             // Redo the inizilization of opal_output in order to change
             // the hostname printed for debugging purpose
             opal_output_renew_hostname();
+
+            opal_output(0,"FROM BTL_MIGRATING_EXEC TO BTL_MIGRATING_DONE");
+            mig_state = BTL_MIGRATING_DONE;
+
 
             orte_oob_base_mig_event(ORTE_MIG_DONE, NULL);
 
