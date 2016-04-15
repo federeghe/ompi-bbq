@@ -124,6 +124,12 @@ bool mca_btl_tcp_frag_send(mca_btl_tcp_frag_t* frag, int sd)
     while(cnt < 0) {
         cnt = writev(sd, frag->iov_ptr, frag->iov_cnt);
         if(cnt < 0) {
+
+            if (MCA_BTL_TCP_FROZEN == frag->endpoint->endpoint_state) {
+                opal_output(0,"Send failed due to frozen, ignoring error...");
+                return false;
+            }
+
             switch(opal_socket_errno) {
             case EINTR:
                 continue;
@@ -223,14 +229,20 @@ bool mca_btl_tcp_frag_recv(mca_btl_tcp_frag_t* frag, int sd)
 #if ORTE_ENABLE_MIGRATION
             if(btl_endpoint->endpoint_state == MCA_BTL_TCP_FROZEN){
                 opal_output(0, "%s btl: PEER CLOSED SOCKET - EXPECTED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                opal_event_del(&btl_endpoint->endpoint_recv_event);
                 return false;
             }
 #endif
 
         if( cnt == 0 ) {
-            opal_output(0, "%s btl: ENDPOINT FRAG RECV FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            // TODO
+/*            opal_output(0, "%s btl: ENDPOINT FRAG RECV FAILED", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
-            mca_btl_tcp_endpoint_close(btl_endpoint);
+            mca_btl_tcp_endpoint_close(btl_endpoint);*/
+            opal_output(0, "%s btl: ENDPOINT FRAG RECV FAILED: FROZEN", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            btl_endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
+            opal_event_del(&btl_endpoint->endpoint_recv_event);
+
             return false;
         }
         switch(opal_socket_errno) {

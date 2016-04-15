@@ -1184,6 +1184,9 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
             if (NULL == (waiting_child=opal_pointer_array_get_item(orte_local_children, i))) {
                 continue;
             }
+            opal_output(0, "%s orted_cmd: Send signal to first child (PREPARE)",
+                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
             found=true;
             curr_wait_child = i;
             break;
@@ -1221,6 +1224,9 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
             if (NULL == (waiting_child=opal_pointer_array_get_item(orte_local_children, i))) {
                 continue;
             }
+            opal_output(0, "%s orted_cmd: Send signal to first child (EXEC)",
+                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
             found=true;
             curr_wait_child = i;
             break;
@@ -1314,6 +1320,9 @@ static void orted_mig_child_ack_sig(int sig) {
         if (NULL == (waiting_child=opal_pointer_array_get_item(orte_local_children, i))) {
             continue;
         }
+        opal_output(0, "%s orted_cmd: Send signal to child",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
         curr_wait_child = i;
         break;
     }

@@ -282,6 +282,15 @@ int orte_mig_base_restore(char *path) {
         return ORTE_ERROR;
     }
 
+#ifdef SO_REUSEPORT // Portability old linux version
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEPORT, (const char*)&reuse, sizeof(reuse)) < 0) {
+        opal_output_verbose(0, orte_mig_base_framework.framework_output,
+                    "%s orted:mig:base Can't reuse port.",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return ORTE_ERROR;
+    }
+#endif
+
     if(0>bind(socket_fd,(struct sockaddr *)&addr, sizeof(addr)))
     {
         opal_output_verbose(0, orte_mig_base_framework.framework_output,

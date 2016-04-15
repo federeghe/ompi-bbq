@@ -1219,5 +1219,26 @@ void mca_btl_tcp_endpoint_send_handler(int sd, short flags, void* user)
     OPAL_THREAD_UNLOCK(&btl_endpoint->endpoint_send_lock);
 }
 
+void mca_btl_tcp_endpoint_set_blocking (mca_btl_base_endpoint_t* btl_endpoint, bool mode) {
+    int flags;
+    /* setup the socket as non-blocking */
+    if((flags = fcntl(btl_endpoint->endpoint_sd, F_GETFL, 0)) < 0) {
+        BTL_ERROR(("fcntl(F_GETFL) failed: %s (%d)",
+                   strerror(opal_socket_errno), opal_socket_errno));
+        opal_output(0,"fcntl(F_GETFL) failed: %s (%d)",
+                           strerror(opal_socket_errno), opal_socket_errno);
+
+    } else {
+        if (mode) {
+            // blocking
+            flags &= ~O_NONBLOCK;
+        } else {
+            flags |= O_NONBLOCK;
+        }
+        if(fcntl(btl_endpoint->endpoint_sd, F_SETFL, flags) < 0)
+            BTL_ERROR(("fcntl(F_SETFL) failed: %s (%d)",
+                       strerror(opal_socket_errno), opal_socket_errno));
+    }
+}
 
 

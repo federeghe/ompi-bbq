@@ -83,6 +83,7 @@ void mca_btl_tcp_endpoint_close(mca_btl_base_endpoint_t*);
 int  mca_btl_tcp_endpoint_send(mca_btl_base_endpoint_t*, struct mca_btl_tcp_frag_t*);
 void mca_btl_tcp_endpoint_accept(mca_btl_base_endpoint_t*, struct sockaddr*, int);
 void mca_btl_tcp_endpoint_shutdown(mca_btl_base_endpoint_t*);
+void mca_btl_tcp_endpoint_set_blocking (mca_btl_base_endpoint_t* btl_endpoint, bool mode);
 
 #if ORTE_ENABLE_MIGRATION
 void mca_btl_tcp_endpoint_send_handler(int sd, short flags, void* user);

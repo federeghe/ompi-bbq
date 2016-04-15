@@ -1694,6 +1694,7 @@ int orte_odls_base_default_signal_local_procs(const orte_process_name_t *proc, i
             if (NULL == (child = (orte_proc_t*)opal_pointer_array_get_item(orte_local_children, i))) {
                 continue;
             }
+            opal_output(0, "OLDS Sending signal to %i", child->pid);
             if (ORTE_SUCCESS != (rc = signal_local(child->pid, (int)signal))) {
                 ORTE_ERROR_LOG(rc);
             }
@@ -1707,6 +1708,7 @@ int orte_odls_base_default_signal_local_procs(const orte_process_name_t *proc, i
                 continue;
             }
         if (OPAL_EQUAL == opal_dss.compare(&(child->name), (orte_process_name_t*)proc, ORTE_NAME)) {
+            opal_output(0, "OLDS Sending signal to %i", child->pid);
             if (ORTE_SUCCESS != (rc = signal_local(child->pid, (int)signal))) {
                 ORTE_ERROR_LOG(rc);
             }
