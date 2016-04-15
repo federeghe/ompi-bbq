@@ -76,6 +76,11 @@ mca_btl_tcp_module_t mca_btl_tcp_module = {
 
 int migration_state = BTL_RUNNING;
 
+/**
+ * Restore frozen endpoints after migration. If a frag has been appended before migration, start a new connection in order to send it.
+ * @param btl This btl_tcp module
+ * @return 
+ */
 int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
     mca_btl_base_endpoint_t *endpoint, *next;
     mca_btl_tcp_module_t *tcp_btl = (mca_btl_tcp_module_t *)btl;
@@ -83,24 +88,17 @@ int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
     char *hostname;
     int i = 0;
     
-    //TODO: parse dst and src strings somehow
+    opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+        "%s btl:tcp: restoring endpoints...",
+        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
-    //opal_output(0, "%s btl: restoring endpoints...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     switch(migration_state){
         case BTL_MIGRATING_DONE:
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
-
-                opal_output(0, "######################### Socket %i Status %i nfrags %i esf %i",
-                        endpoint->endpoint_sd, endpoint->endpoint_state, opal_list_get_size(&endpoint->endpoint_frags),endpoint->endpoint_send_frag != NULL);
                 if(MCA_BTL_TCP_FROZEN == endpoint->endpoint_state) {
                     endpoint->endpoint_state = MCA_BTL_TCP_CLOSED;
-                    opal_output(0, "UNFROZEN with nfrags %i and endpoint_send_frag %i",opal_list_get_size(&endpoint->endpoint_frags),
-                            endpoint->endpoint_send_frag != NULL);
-
                     if(opal_list_get_size(&endpoint->endpoint_frags) > 0 || endpoint->endpoint_send_frag != NULL) {
                         mca_btl_tcp_endpoint_start_connect(endpoint);
-                        opal_output(0, "%s btl: started connection socket %i (nfrags %i)",
-                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), endpoint->endpoint_sd, opal_list_get_size(&endpoint->endpoint_frags));
                     }
                 }
             }
@@ -109,29 +107,31 @@ int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
             hostname = strchr(btl_mig_dst, '@')+1;
             inet_aton(hostname, &address);
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
-                opal_output(0, "######################### Socket %i Status %i nfrags %i esf %i",
-                        endpoint->endpoint_sd, endpoint->endpoint_state, opal_list_get_size(&endpoint->endpoint_frags),endpoint->endpoint_send_frag != NULL);
-
                 if(MCA_BTL_TCP_FROZEN == endpoint->endpoint_state){
                     endpoint->endpoint_state = MCA_BTL_TCP_CLOSED;
-
                     if(opal_list_get_size(&endpoint->endpoint_frags) > 0 || endpoint->endpoint_send_frag != NULL) {
                         mca_btl_tcp_endpoint_start_connect(endpoint);
-                        opal_output(0, "%s btl: started connection socket %i (nfrags %i)",
-                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), endpoint->endpoint_sd, opal_list_get_size(&endpoint->endpoint_frags));
                     }
                 }
-
             }
             break;
         default:
-            opal_output(0, "%s btl: invalid migration state while restoring endpoints", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                "%s btl:tcp: unexpected migration state",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     }
+    
+    opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+        "%s btl:tcp: done restoring endpoints.",
+        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
     return OMPI_SUCCESS;
 }
 
-
+/**
+ * Close sockets of the endpoints involved in the ongoing migration, stop events and update migrating host address
+ * @param btl This btl_tcp module
+ */
 void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
     mca_btl_base_endpoint_t *endpoint, *next;
     mca_btl_tcp_module_t *tcp_btl = (mca_btl_tcp_module_t *)btl;
@@ -141,32 +141,25 @@ void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
     const char *hostname = strchr(btl_mig_dst, '@')+1;
     inet_aton(hostname, &address);
 
-    opal_output(0, "%s btl: closing sockets...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+        "%s btl:tcp: closing sockets...",
+        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
         switch(migration_state){
             case BTL_MIGRATING_EXEC:
                 OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
-
-                    opal_output(0,"mca_btl_tcp_mig_close_sockets MIG, endpoint to %s in state %i on socket %i",
-                            endpoint->endpoint_proc->proc_ompi->proc_hostname,endpoint->endpoint_state, endpoint->endpoint_sd);
-
-                    if(MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state)
-                    {
-                        opal_output(0, "######################### (CLOSING) Socket %i Status %i nfrags %i esf %i",
-                                endpoint->endpoint_sd, endpoint->endpoint_state, opal_list_get_size(&endpoint->endpoint_frags),endpoint->endpoint_send_frag != NULL);
-
+                    if(MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state){
                         if(0 != close(endpoint->endpoint_sd)){
-                            opal_output(0, "%s btl: error while closing socket on %s",
-                                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
+                            opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                                "%s btl:tcp: error while closing socket on %s",
+                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
                         }
                         if (endpoint->endpoint_recv_event.ev_base != NULL)
                             opal_event_del(&endpoint->endpoint_recv_event);
                         if (endpoint->endpoint_send_event.ev_base != NULL)
                             opal_event_del(&endpoint->endpoint_send_event);
-                        opal_output(0, "%s btl: MIG freezing socket %i", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), endpoint->endpoint_sd);
                         endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
                         endpoint->endpoint_sd = -1;
-
                     }
                     if(0 == strcmp(hostname_src, STR_FROM_ENDPOINT(endpoint))){
                         endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet = address;
@@ -176,54 +169,61 @@ void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
                 break;
             case BTL_NOT_MIGRATING_EXEC:
                 OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
-                    opal_output(0,"mca_btl_tcp_mig_close_sockets NOTMIG, endpoint to %s in state %i on socket %i",
-                            endpoint->endpoint_proc->proc_ompi->proc_hostname,endpoint->endpoint_state, endpoint->endpoint_sd);
                     if(0 == strcmp(hostname_src, STR_FROM_ENDPOINT(endpoint))){
                         if(MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state) {
-                            opal_output(0, "######################### (CLOSING) Socket %i Status %i nfrags %i esf %i",
-                                    endpoint->endpoint_sd, endpoint->endpoint_state, opal_list_get_size(&endpoint->endpoint_frags),endpoint->endpoint_send_frag != NULL);
                             if(0 != close(endpoint->endpoint_sd)){
-                                opal_output(0, "%s btl: error while closing socket on %s",
-                                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
+                                opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                                    "%s btl:tcp: error while closing socket on %s",
+                                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
                             }
                             if (endpoint->endpoint_recv_event.ev_base != NULL)
                                 opal_event_del(&endpoint->endpoint_recv_event);
                             if (endpoint->endpoint_send_event.ev_base != NULL)
                                 opal_event_del(&endpoint->endpoint_send_event);
-                            opal_output(0, "%s btl: NOTMIG freezing socket %i", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), endpoint->endpoint_sd);
                             endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
                             endpoint->endpoint_sd = -1;
                         }
-
                         endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet = address;
                         strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, btl_mig_dst);
                     }
                 }
                 break;
             default:
+                opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                                "%s btl:tcp: unexpected migration state",
+                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 ;
         }
-
-        opal_output(0, "%s btl: closing sockets END...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+            "%s btl:tcp: done closing sockets.",
+            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
 }
+
+/**
+ * Freeze active endpoints in order to stop them from sending data, migration is about to start.
+ * @param btl This btl_tcp module
+ */
 
 void mca_btl_tcp_freeze_endpoints(mca_btl_base_module_t* btl){
     mca_btl_base_endpoint_t *endpoint, *next;
     mca_btl_tcp_module_t *tcp_btl = (mca_btl_tcp_module_t *)btl;
     
-    opal_output(0, "%s btl: freezing endpoints...", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                    "%s btl:tcp: freezing endpoints...",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     
     switch(migration_state){
+        //If I'm the migrating node I have to freeze all my endpoints
         case BTL_MIGRATING_PREPARE:
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
                 if(MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state)
                     endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
                     shutdown(endpoint->endpoint_sd, SHUT_WR);
-                    opal_output(0,"shutdown sd %i", endpoint->endpoint_sd);
                     mca_btl_tcp_endpoint_set_blocking(endpoint, true);
             }
             break;
+        //Otherwise I have to close just the endpoints directed to the migrating node
         case BTL_NOT_MIGRATING_PREPARE:
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
                 if (MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state) {
@@ -231,21 +231,30 @@ void mca_btl_tcp_freeze_endpoints(mca_btl_base_module_t* btl){
                         inet_ntoa(endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet))){
                         endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
                         shutdown(endpoint->endpoint_sd, SHUT_WR);
-                        opal_output(0,"shutdown sd %i", endpoint->endpoint_sd);
                         mca_btl_tcp_endpoint_set_blocking(endpoint, true);
                     }
                 }
             }
             break;
         default:
-            opal_output(0, "%s btl: unexpected state", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                "%s btl:tcp: unexpected migration state.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
     }
+    
+    opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                "%s btl:tcp: done freezing endpoints.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 }
 
+/**
+ * FSM which manages migration state. Triggered by btl_base_frame each time it gets signaled.
+ * @param event New migration state
+ * @param data  Data passed by btl_base_frame. It's basically this btl_tcp module
+ * @return
+ */
 int mca_btl_tcp_mig_event(int event, void *data){    
     migration_state = event;
-
-    opal_output(0, "number of endpoints: %i ", opal_list_get_size(&((mca_btl_tcp_module_t *) data)->tcp_endpoints));
 
     switch(migration_state){
         case BTL_MIGRATING_PREPARE:
@@ -574,7 +583,6 @@ int mca_btl_tcp_send( struct mca_btl_base_module_t* btl,
                       struct mca_btl_base_descriptor_t* descriptor, 
                       mca_btl_base_tag_t tag )
 {
-    opal_output(0,"+++++++++++++++++++++++++++++ mca_btl_tcp_send");
     mca_btl_tcp_module_t* tcp_btl = (mca_btl_tcp_module_t*) btl; 
     mca_btl_tcp_frag_t* frag = (mca_btl_tcp_frag_t*)descriptor; 
     int i;
@@ -604,13 +612,11 @@ int mca_btl_tcp_send( struct mca_btl_base_module_t* btl,
         case BTL_MIGRATING_PREPARE:
         case BTL_MIGRATING_EXEC:
             endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
-            opal_output(0, "%s btl:endpoint: send attempt, endpoint frozen", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             break;
         case BTL_NOT_MIGRATING_PREPARE:
         case BTL_NOT_MIGRATING_EXEC:
             if (0 == strcmp(STR_FROM_ENDPOINT(endpoint), strchr(btl_mig_src, '@')+1)){
                 endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
-                opal_output(0, "%s btl:endpoint: send attempt, endpoint frozen", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             }
             break;
         default:
@@ -633,8 +639,6 @@ int mca_btl_tcp_put( mca_btl_base_module_t* btl,
                      mca_btl_base_endpoint_t* endpoint,
                      mca_btl_base_descriptor_t* descriptor )
 {
-    opal_output(0,"+++++++++++++++++++++++++++++ mca_btl_tcp_put");
-
     mca_btl_tcp_module_t* tcp_btl = (mca_btl_tcp_module_t*) btl; 
     mca_btl_tcp_frag_t* frag = (mca_btl_tcp_frag_t*)descriptor; 
     int i;
@@ -666,13 +670,11 @@ int mca_btl_tcp_put( mca_btl_base_module_t* btl,
         case BTL_MIGRATING_PREPARE:
         case BTL_MIGRATING_EXEC:
             endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
-            opal_output(0, "%s btl:endpoint: send attempt, endpoint frozen", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             break;
         case BTL_NOT_MIGRATING_PREPARE:
         case BTL_NOT_MIGRATING_EXEC:
             if (0 == strcmp(STR_FROM_ENDPOINT(endpoint), strchr(btl_mig_src, '@')+1)){
                 endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
-                opal_output(0, "%s btl:endpoint: send attempt, endpoint frozen", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             }
             break;
         default:
@@ -698,8 +700,6 @@ int mca_btl_tcp_get(
     mca_btl_base_endpoint_t* endpoint,
     mca_btl_base_descriptor_t* descriptor)
 {
-    opal_output(0,"+++++++++++++++++++++++++++++ mca_btl_tcp_get");
-
     mca_btl_tcp_module_t* tcp_btl = (mca_btl_tcp_module_t*) btl; 
     mca_btl_tcp_frag_t* frag = (mca_btl_tcp_frag_t*)descriptor; 
     int rc;
@@ -725,13 +725,11 @@ int mca_btl_tcp_get(
         case BTL_MIGRATING_PREPARE:
         case BTL_MIGRATING_EXEC:
             endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
-            opal_output(0, "%s btl:endpoint: send attempt, endpoint frozen", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             break;
         case BTL_NOT_MIGRATING_PREPARE:
         case BTL_NOT_MIGRATING_EXEC:
             if (0 == strcmp(STR_FROM_ENDPOINT(endpoint), strchr(btl_mig_src, '@')+1)){
                 endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
-                opal_output(0, "%s btl:endpoint: send attempt, endpoint frozen", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             }
             break;
         default:

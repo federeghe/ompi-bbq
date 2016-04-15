@@ -88,8 +88,6 @@ char btl_mig_src[30];
 // Orted signal to freeze btl connections
 static void orted_btl_freeze_sig(int sig) {
 
-    opal_output(0, "orted_btl_freeze_sig");
-
     static int mig_state = BTL_RUNNING;
     FILE *mig_info_f;
     char filename[40];
@@ -101,11 +99,8 @@ static void orted_btl_freeze_sig(int sig) {
         // ???
         return;
     }
-    opal_output(0, "My currently mig state is %i", mig_state);
-
     switch(mig_state){
         case BTL_RUNNING:
-            opal_output(0, "BTL RUNNING");
 
             /* Migration hasn't started yet. We need to tell all endpoints to stop communicating.*/
             sprintf(filename,"/tmp/orted_mig_nodes_%i",getppid());
@@ -118,24 +113,18 @@ static void orted_btl_freeze_sig(int sig) {
             fscanf(mig_info_f,"%u %u %s %s",&src_jobid,&src_vpid,btl_mig_src,btl_mig_dst);
 
             fclose(mig_info_f);
-            opal_output(0, "BTL RUNNING  AFTER FILE");
             
             mig_state = (src_vpid == OMPI_RTE_MY_NODEID ? BTL_MIGRATING_PREPARE : BTL_NOT_MIGRATING_PREPARE);
             
             if (mig_state == BTL_MIGRATING_PREPARE) {
                 orte_oob_base_mig_event(ORTE_MIG_PREPARE_APP, strchr(btl_mig_src, '@')+1);
             }
-            opal_output(0, "BTL RUNNING AFTER OOB");
 
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
                     sm->btl_module->btl_mig_event(mig_state, sm->btl_module);
             }
-            opal_output(0, "BTL RUNNING AFTER LIST");
-
             usleep(10000);
             opal_event_loop(opal_event_base, EVLOOP_ONCE | EVLOOP_NONBLOCK);
-
-            opal_output(0, "------------------> %s SEGNALO IL PADRE CAZZO", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
             kill(getppid(), SIGUSR1);
 
@@ -153,8 +142,6 @@ static void orted_btl_freeze_sig(int sig) {
             usleep(10000);
             opal_event_loop(opal_event_base, EVLOOP_ONCE | EVLOOP_NONBLOCK);
 
-            opal_output(0, "------------------> %s SEGNALO IL PADRE CAZZO", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
             kill(getppid(), SIGUSR1);
             break;
         case BTL_NOT_MIGRATING_PREPARE:
@@ -167,36 +154,25 @@ static void orted_btl_freeze_sig(int sig) {
             usleep(10000);
             opal_event_loop(opal_event_base, EVLOOP_ONCE | EVLOOP_NONBLOCK);
 
-            opal_output(0, "------------------> %s SEGNALO IL PADRE CAZZO", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
             kill(getppid(), SIGUSR1);
             break;
         case BTL_MIGRATING_EXEC:
             // Redo the inizilization of opal_output in order to change
             // the hostname printed for debugging purpose
             opal_output_renew_hostname();
-
-            opal_output(0,"FROM BTL_MIGRATING_EXEC TO BTL_MIGRATING_DONE");
             mig_state = BTL_MIGRATING_DONE;
-
-
             orte_oob_base_mig_event(ORTE_MIG_DONE_APP, NULL);
 
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
                     sm->btl_module->btl_mig_event(mig_state, sm->btl_module);
             }
-
-            opal_output(0,"FROM BTL_MIGRATING_DONE TO BTL_RUNNING");
             mig_state = BTL_RUNNING;
             break;
         case BTL_NOT_MIGRATING_EXEC:
-            opal_output(0,"FROM BTL_NOT_MIGRATING_EXEC TO BTL_NOT_MIGRATING_DONE");
             mig_state = BTL_NOT_MIGRATING_DONE;
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
                     sm->btl_module->btl_mig_event(mig_state, sm->btl_module);
             }
-
-            opal_output(0,"FROM BTL_NOT_MIGRATING_DONE TO BTL_RUNNING");
             mig_state = BTL_RUNNING;
             break;
         default:
