@@ -93,7 +93,7 @@ int mig_status;
 int curr_wait_child=-1;
 char* mig_dest_host;
 char* mig_src_host;
-opal_event_t* signal_child_event;
+opal_event_t* signal_child_event=NULL;
 sighandler_t prev_handler;
 sighandler_t prev_handler_2;
 orte_process_name_t mig_src_p;
@@ -1259,8 +1259,8 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     case ORTE_DAEMON_MIG_DONE:
         opal_output(0, "%s orted: command ORTE_DAEMON_MIG_DONE received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
-        opal_event_signal_del(signal_child_event);
-        free(signal_child_event);
+        if (signal_child_event != NULL)
+            opal_event_signal_del(signal_child_event);
 
         if(!ORTE_PROC_IS_HNP){
             if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, SIGUSR1))) {
