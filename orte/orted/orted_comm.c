@@ -131,7 +131,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
     orte_job_t *jdata;
     orte_process_name_t proc, proc2;
     orte_process_name_t *return_addr;
-    int32_t i, num_replies, num_children;
+    int32_t i, num_replies;
     bool hnp_accounted_for;
     opal_pointer_array_t procarray;
     orte_proc_t *proct;
@@ -1200,10 +1200,11 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
             //No children, send ack immediately
             SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
         }else{
-            (opal_event_t*)malloc(sizeof(opal_event_t));
 
-            opal_event_signal_set(orte_event_base);
-            prev_handler = signal(SIGUSR1, orted_mig_child_ack_sig);
+            // Activate the signal handler
+            signal_child_event = (opal_event_t*)malloc(sizeof(opal_event_t));
+            opal_event_signal_set(orte_event_base, signal_child_event, SIGUSR1, orted_mig_child_ack_sig, NULL);
+            opal_event_signal_add(signal_child_event, 0);
 
             /* Now I send the signal to all children to let them know that
              * they must read the file. They will signal me back later.
@@ -1257,6 +1258,9 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         break;
     case ORTE_DAEMON_MIG_DONE:
         opal_output(0, "%s orted: command ORTE_DAEMON_MIG_DONE received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
+        opal_event_signal_del(signal_child_event);
+        free(signal_child_event);
 
         if(!ORTE_PROC_IS_HNP){
             if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, SIGUSR1))) {
