@@ -741,7 +741,6 @@ static void ft_event(int state) {
 
 #if ORTE_ENABLE_MIGRATION
 bool mca_oob_tcp_migrating_me = false;
-bool mca_oob_tcp_app_mig = false;
 mca_oob_tcp_peer_t* mca_oob_tcp_migrating_peer=NULL;
 #define AM_I_NODE(p) (((orte_process_name_t*)p)->jobid == ORTE_PROC_MY_NAME->jobid \
 					  && ((orte_process_name_t*)p)->vpid == ORTE_PROC_MY_NAME->vpid)
@@ -754,6 +753,7 @@ mca_oob_tcp_peer_t* mca_oob_tcp_migrating_peer=NULL;
  */
 static void mig_event(int event, void* data) {
     static orte_process_name_t peer_name;
+    static char* app_src;
 
     switch(event) {
 
@@ -785,14 +785,15 @@ static void mig_event(int event, void* data) {
 
 
         }
-        else {
-            // Process migration: in this case the MPI process received from the orted
-            // the signal via btl to migrate. In this case I have to close the sockets
-            // between me and the orted.
-            mca_oob_tcp_migrating_me=true;
-            mca_oob_tcp_app_mig = true;
-            printf ("%s:oob_tcp_mig_event: App migration.\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-        }
+    break;
+
+    case ORTE_MIG_PREPARE_APP:
+        // Process migration: in this case the MPI process received from the orted
+        // the signal via btl to migrate. In this case I have to close the sockets
+        // between me and the orted.
+        mca_oob_tcp_migrating_me=true;
+        app_src = strdup((const char*)data);
+        printf ("%s:oob_tcp_mig_event: App migration.\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
     break;
 
@@ -828,9 +829,12 @@ static void mig_event(int event, void* data) {
 		// Oh! Wow! I'm the migrating node!
      	mig_me(false);
 
-     	if (mca_oob_tcp_app_mig) {
-     	    mig_app("10.10.1.3", "10.10.1.2");
-     	}
+    break;
+
+    case ORTE_MIG_EXEC_APP:
+
+        mig_app(app_src, (const char*)data);
+
     break;
 
     case ORTE_MIG_DONE:
@@ -839,6 +843,13 @@ static void mig_event(int event, void* data) {
     	} else {
             mca_oob_tcp_migrating_peer = NULL;
     	}
+    	mca_oob_tcp_migrating_me = false;
+    break;
+
+    case ORTE_MIG_DONE_APP:
+        mig_me(true);
+        free(app_src);
+        mca_oob_tcp_migrating_me = false;
     break;
 
     default:
@@ -872,8 +883,9 @@ static void mig_app(const char* src, const char* dst) {
     if (OPAL_SUCCESS == opal_hash_table_get_first_key_uint64(&mca_oob_tcp_module.peers, &ui64,
                                                              (void**)&peer_tmp, (void**)&nptr)) {
         if (NULL != peer_tmp) {
-
+            oob_mig_freeze_defreeze(false,peer_tmp);
             OPAL_LIST_FOREACH(addr, &peer_tmp->addrs, mca_oob_tcp_addr_t) {
+
                 struct sockaddr_in * sockin = (struct sockaddr_in *)&addr->addr;
                 if(memcmp(&sockin->sin_addr,&address_src, sizeof(struct in_addr))==0) {
                     sockin->sin_addr = address_dst;
@@ -883,6 +895,7 @@ static void mig_app(const char* src, const char* dst) {
         while (OPAL_SUCCESS == opal_hash_table_get_next_key_uint64(&mca_oob_tcp_module.peers, &ui64,
                                                                    (void**)&peer_tmp, nptr, (void**)&nptr)) {
             if (NULL != peer_tmp) {
+                oob_mig_freeze_defreeze(false,peer_tmp);
                 OPAL_LIST_FOREACH(addr, &peer_tmp->addrs, mca_oob_tcp_addr_t) {
                     struct sockaddr_in * sockin = (struct sockaddr_in *)&addr->addr;
                     if(memcmp(&sockin->sin_addr,&address_src, sizeof(struct in_addr))==0) {

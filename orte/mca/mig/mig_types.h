@@ -18,6 +18,9 @@
 #define ORTE_MIG_PREPARE 0
 #define ORTE_MIG_EXEC 1
 #define ORTE_MIG_DONE 2
+#define ORTE_MIG_PREPARE_APP 3
+#define ORTE_MIG_EXEC_APP 4
+#define ORTE_MIG_DONE_APP 5
 
 // Constants for information forwarding
 #define ORTE_MIG_READY 0

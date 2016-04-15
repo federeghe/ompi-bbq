@@ -93,6 +93,7 @@ int mig_status;
 int curr_wait_child=-1;
 char* mig_dest_host;
 char* mig_src_host;
+opal_event_t* signal_child_event;
 sighandler_t prev_handler;
 sighandler_t prev_handler_2;
 orte_process_name_t mig_src_p;
@@ -1199,6 +1200,9 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
             //No children, send ack immediately
             SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
         }else{
+            (opal_event_t*)malloc(sizeof(opal_event_t));
+
+            opal_event_signal_set(orte_event_base);
             prev_handler = signal(SIGUSR1, orted_mig_child_ack_sig);
 
             /* Now I send the signal to all children to let them know that
