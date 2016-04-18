@@ -32,6 +32,8 @@
 #include "ompi/mca/mpool/base/base.h" 
 #include "ompi/mca/mpool/mpool.h" 
 #include "ompi/proc/proc.h"
+#include "opal/mca/db/db.h"
+
 
 #define STR_FROM_ENDPOINT(x) inet_ntoa(x->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet)
 
@@ -76,17 +78,32 @@ mca_btl_tcp_module_t mca_btl_tcp_module = {
 
 int migration_state = BTL_RUNNING;
 
+static bool is_ep_migrating(mca_btl_base_endpoint_t *endpoint) {
+    int ret;
+    ompi_vpid_t *vptr, vpid;
+
+    vptr = &vpid;
+
+    // Get the id of the process that is the endpoint
+    if (OMPI_SUCCESS != (ret = opal_db.fetch((opal_identifier_t*)
+        &endpoint->endpoint_proc->proc_ompi->proc_name, OMPI_RTE_NODE_ID, (void**)&vptr, OPAL_UINT32))) {
+        opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+            "%s btl:tcp: vpid for migration not found in the local database.",
+            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        return false;
+    }
+
+    return btl_mig_src_vpid == vpid;
+}
+
 /**
  * Restore frozen endpoints after migration. If a frag has been appended before migration, start a new connection in order to send it.
  * @param btl This btl_tcp module
  * @return 
  */
-int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
+static int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
     mca_btl_base_endpoint_t *endpoint, *next;
     mca_btl_tcp_module_t *tcp_btl = (mca_btl_tcp_module_t *)btl;
-    struct in_addr address;
-    char *hostname;
-    int i = 0;
     
     opal_output_verbose(0, ompi_btl_base_framework.framework_output,
         "%s btl:tcp: restoring endpoints...",
@@ -104,8 +121,6 @@ int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
             }
             break;
         case BTL_NOT_MIGRATING_DONE:
-            hostname = strchr(btl_mig_dst, '@')+1;
-            inet_aton(hostname, &address);
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
                 if(MCA_BTL_TCP_FROZEN == endpoint->endpoint_state){
                     endpoint->endpoint_state = MCA_BTL_TCP_CLOSED;
@@ -132,12 +147,11 @@ int mca_btl_tcp_mig_restore(mca_btl_base_module_t* btl){
  * Close sockets of the endpoints involved in the ongoing migration, stop events and update migrating host address
  * @param btl This btl_tcp module
  */
-void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
+static void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
     mca_btl_base_endpoint_t *endpoint, *next;
     mca_btl_tcp_module_t *tcp_btl = (mca_btl_tcp_module_t *)btl;
     
     struct in_addr address;
-    const char *hostname_src = strchr(btl_mig_src, '@')+1;
     const char *hostname = strchr(btl_mig_dst, '@')+1;
     inet_aton(hostname, &address);
 
@@ -161,7 +175,7 @@ void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
                         endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
                         endpoint->endpoint_sd = -1;
                     }
-                    if(0 == strcmp(hostname_src, STR_FROM_ENDPOINT(endpoint))){
+                    if( is_ep_migrating(endpoint) ){
                         endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet = address;
                         strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, btl_mig_dst);
                     }
@@ -169,7 +183,7 @@ void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
                 break;
             case BTL_NOT_MIGRATING_EXEC:
                 OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
-                    if(0 == strcmp(hostname_src, STR_FROM_ENDPOINT(endpoint))){
+                    if(is_ep_migrating(endpoint)) {
                         if(MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state) {
                             if(0 != close(endpoint->endpoint_sd)){
                                 opal_output_verbose(0, ompi_btl_base_framework.framework_output,
@@ -205,7 +219,7 @@ void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
  * @param btl This btl_tcp module
  */
 
-void mca_btl_tcp_freeze_endpoints(mca_btl_base_module_t* btl){
+static void mca_btl_tcp_freeze_endpoints(mca_btl_base_module_t* btl){
     mca_btl_base_endpoint_t *endpoint, *next;
     mca_btl_tcp_module_t *tcp_btl = (mca_btl_tcp_module_t *)btl;
     
@@ -227,8 +241,7 @@ void mca_btl_tcp_freeze_endpoints(mca_btl_base_module_t* btl){
         case BTL_NOT_MIGRATING_PREPARE:
             OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
                 if (MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state) {
-                    if(0 == strcmp(strchr(btl_mig_src, '@')+1,
-                        inet_ntoa(endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet))){
+                    if(is_ep_migrating(endpoint)){
                         endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
                         shutdown(endpoint->endpoint_sd, SHUT_WR);
                         mca_btl_tcp_endpoint_set_blocking(endpoint, true);
@@ -615,7 +628,7 @@ int mca_btl_tcp_send( struct mca_btl_base_module_t* btl,
             break;
         case BTL_NOT_MIGRATING_PREPARE:
         case BTL_NOT_MIGRATING_EXEC:
-            if (0 == strcmp(STR_FROM_ENDPOINT(endpoint), strchr(btl_mig_src, '@')+1)){
+            if (is_ep_migrating(endpoint)){
                 endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
             }
             break;
@@ -673,7 +686,7 @@ int mca_btl_tcp_put( mca_btl_base_module_t* btl,
             break;
         case BTL_NOT_MIGRATING_PREPARE:
         case BTL_NOT_MIGRATING_EXEC:
-            if (0 == strcmp(STR_FROM_ENDPOINT(endpoint), strchr(btl_mig_src, '@')+1)){
+            if (is_ep_migrating(endpoint)){
                 endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
             }
             break;
@@ -728,7 +741,7 @@ int mca_btl_tcp_get(
             break;
         case BTL_NOT_MIGRATING_PREPARE:
         case BTL_NOT_MIGRATING_EXEC:
-            if (0 == strcmp(STR_FROM_ENDPOINT(endpoint), strchr(btl_mig_src, '@')+1)){
+            if (is_ep_migrating(endpoint)){
                 endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
             }
             break;

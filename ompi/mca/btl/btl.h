@@ -120,6 +120,10 @@
 #include "ompi/mca/mpool/mpool.h"
 #include "ompi/types.h"
 #include "opal/types.h"
+#include "ompi/datatype/ompi_datatype.h"
+#include "ompi/runtime/mpiruntime.h"
+#include "ompi/runtime/ompi_module_exchange.h"
+#include "ompi/runtime/params.h"
 
 #include "opal/mca/crs/crs.h"
 #include "opal/mca/crs/base/base.h"
@@ -225,6 +229,7 @@ typedef uint8_t mca_btl_base_tag_t;
 
 extern char btl_mig_src[30];
 extern char btl_mig_dst[30];
+extern ompi_vpid_t btl_mig_src_vpid;
 
 #endif
 

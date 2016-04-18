@@ -82,8 +82,9 @@ bool mca_btl_base_thread_multiple_override = false;
 #if ORTE_ENABLE_MIGRATION
 
 sighandler_t prev_handler;
-char btl_mig_dst[30];
+ompi_vpid_t btl_mig_src_vpid;
 char btl_mig_src[30];
+char btl_mig_dst[30];
 
 // Orted signal to freeze btl connections
 static void orted_btl_freeze_sig(int sig) {
@@ -92,7 +93,6 @@ static void orted_btl_freeze_sig(int sig) {
     FILE *mig_info_f;
     char filename[40];
     static uint32_t src_jobid;
-    static uint32_t src_vpid;
     mca_btl_base_selected_module_t *sm, *next;
     
     if (OPAL_UNLIKELY(sig != SIGUSR1)) {
@@ -110,11 +110,11 @@ static void orted_btl_freeze_sig(int sig) {
                 return;
             }
 
-            fscanf(mig_info_f,"%u %u %s %s",&src_jobid,&src_vpid,btl_mig_src,btl_mig_dst);
+            fscanf(mig_info_f,"%u %u %s %s",&src_jobid,&btl_mig_src_vpid,btl_mig_src,btl_mig_dst);
 
             fclose(mig_info_f);
             
-            mig_state = (src_vpid == OMPI_RTE_MY_NODEID ? BTL_MIGRATING_PREPARE : BTL_NOT_MIGRATING_PREPARE);
+            mig_state = (btl_mig_src_vpid == OMPI_RTE_MY_NODEID ? BTL_MIGRATING_PREPARE : BTL_NOT_MIGRATING_PREPARE);
             
             if (mig_state == BTL_MIGRATING_PREPARE) {
                 orte_oob_base_mig_event(ORTE_MIG_PREPARE_APP, strchr(btl_mig_src, '@')+1);
