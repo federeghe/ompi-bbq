@@ -1142,8 +1142,9 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
     /* ** MIGRATION ** */
     case ORTE_DAEMON_MIG_PREPARE:
-        opal_output(0, "%s orted: command ORTE_DAEMON_MIG_PREPARE received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
+        if (orte_debug_daemons_flag) {
+            opal_output(0, "%s orted: command ORTE_DAEMON_MIG_PREPARE received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        }
         /* unpack the process name of the migrating node */
         n = 1;
         if (ORTE_SUCCESS != (ret = opal_dss.unpack(buffer, &mig_src_p, &n, ORTE_NAME))) {
@@ -1185,8 +1186,6 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
             if (NULL == (waiting_child=opal_pointer_array_get_item(orte_local_children, i))) {
                 continue;
             }
-            opal_output(0, "%s orted_cmd: Send signal to first child (PREPARE)",
-                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
             found=true;
             curr_wait_child = i;
@@ -1194,9 +1193,6 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         }
 
         if(!found ){
-            //No children, send ack immediately
-            opal_output(0, "%s orted_cmd: No children, send ack immediately",
-                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
             //No children, send ack immediately
             SEND_MIG_ACK(ORTE_MIG_PREPARE_ACK_FLAG);
         }else{
@@ -1218,8 +1214,10 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         break;
     case ORTE_DAEMON_MIG_EXEC:
-        opal_output(0, "%s orted: command ORTE_DAEMON_MIG_EXEC received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
+        if (orte_debug_daemons_flag) {
+            opal_output(0, "%s orted: command ORTE_DAEMON_MIG_EXEC received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        }
         mig_status = ORTE_DAEMON_MIG_EXEC;   // Abuse of constant
         
 
@@ -1229,8 +1227,6 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
             if (NULL == (waiting_child=opal_pointer_array_get_item(orte_local_children, i))) {
                 continue;
             }
-            opal_output(0, "%s orted_cmd: Send signal to first child (EXEC)",
-                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
             found=true;
             curr_wait_child = i;
@@ -1240,9 +1236,6 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         if(!found){
             //No children, send ack immediately
-            opal_output(0, "%s orted_cmd: No children, send ack immediately",
-                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
             SEND_MIG_ACK(ORTE_MIG_READY_FLAG);
         }else{
             //prev_handler = signal(SIGUSR1, orted_mig_child_ack_sig);
@@ -1257,8 +1250,9 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         break;
     case ORTE_DAEMON_MIG_DONE:
-        opal_output(0, "%s orted: command ORTE_DAEMON_MIG_DONE received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
+        if (orte_debug_daemons_flag) {
+            opal_output(0, "%s orted: command ORTE_DAEMON_MIG_DONE received.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        }
         if (signal_child_event != NULL)
             opal_event_signal_del(signal_child_event);
 
@@ -1321,16 +1315,11 @@ static void orted_mig_child_ack_sig(int sig) {
 
     // We have to wait that all children report
     // that are ready for migration via SIGUSR1
-    
-    opal_output(0, "%s orted: received ack from a child.", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
     for (i=curr_wait_child+1; i < orte_local_children->size; i++) {
         if (NULL == (waiting_child=opal_pointer_array_get_item(orte_local_children, i))) {
             continue;
         }
-        opal_output(0, "%s orted_cmd: Send signal to child",
-                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
         curr_wait_child = i;
         break;
     }

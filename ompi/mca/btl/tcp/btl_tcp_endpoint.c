@@ -312,9 +312,10 @@ static inline void mca_btl_tcp_endpoint_event_init(mca_btl_base_endpoint_t* btl_
 {
 #if MCA_BTL_TCP_ENDPOINT_CACHE
     //TODO: UNCOMMENT ASSERT
-    //assert(NULL == btl_endpoint->endpoint_cache);
-    btl_endpoint->endpoint_cache     = (char*)malloc(mca_btl_tcp_component.tcp_endpoint_cache);
-    btl_endpoint->endpoint_cache_pos = btl_endpoint->endpoint_cache;
+    if (NULL == btl_endpoint->endpoint_cache) {
+        btl_endpoint->endpoint_cache     = (char*)malloc(mca_btl_tcp_component.tcp_endpoint_cache);
+        btl_endpoint->endpoint_cache_pos = btl_endpoint->endpoint_cache;
+    }
 #endif  /* MCA_BTL_TCP_ENDPOINT_CACHE */
 
     opal_event_set(opal_event_base, &btl_endpoint->endpoint_recv_event,

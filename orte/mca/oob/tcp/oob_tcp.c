@@ -766,13 +766,13 @@ static void mig_event(int event, void* data) {
                 mca_oob_tcp_migrating_peer = mca_oob_tcp_peer_lookup((orte_process_name_t*)data);
                 if (OPAL_UNLIKELY(mca_oob_tcp_migrating_peer == NULL)) {
                     // Error, no source peer found
-                    opal_output (0, "%s:oob_tcp_mig_event: Could not find process %s for migration.\n",
+                    opal_output_verbose(2, orte_oob_base_framework.framework_output, "%s:oob_tcp_mig_event: Could not find process %s for migration.\n",
                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
                             ORTE_NAME_PRINT((orte_process_name_t*)data));
                     ORTE_ERROR_LOG(ORTE_ERR_BAD_PARAM);
                     return;
                 }
-                opal_output (0, "%s:oob_tcp_mig_event: Preparing migration node %s.\n",
+                opal_output_verbose(2, orte_oob_base_framework.framework_output, "%s:oob_tcp_mig_event: Preparing migration node %s.\n",
                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
                         ORTE_NAME_PRINT((orte_process_name_t*)data));
             } else {
@@ -793,7 +793,7 @@ static void mig_event(int event, void* data) {
         // between me and the orted.
         mca_oob_tcp_migrating_me=true;
         app_src = strdup((const char*)data);
-        printf ("%s:oob_tcp_mig_event: App migration.\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        opal_output_verbose(2, orte_oob_base_framework.framework_output,"%s:oob_tcp_mig_event: App migration.\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
     break;
 
@@ -809,7 +809,7 @@ static void mig_event(int event, void* data) {
                 return;
     		}
 
-    		opal_output (0, "%s:oob_tcp_mig_event: Freezing the migrating node...\n",
+    		opal_output_verbose(2, orte_oob_base_framework.framework_output, "%s:oob_tcp_mig_event: Freezing the migrating node...\n",
     		                            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
     		// Freeze all pending send
@@ -824,7 +824,7 @@ static void mig_event(int event, void* data) {
             return;
     	}
 
-        printf ("%s:oob_tcp_mig_event: App migration(2).\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    	opal_output_verbose(2, orte_oob_base_framework.framework_output,"%s:oob_tcp_mig_event: App migration(2).\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
 		// Oh! Wow! I'm the migrating node!
      	mig_me(false);
@@ -854,7 +854,7 @@ static void mig_event(int event, void* data) {
 
     default:
         // Do nothing
-        opal_output(10, "%s mca_oob_tcp_mig_event: received unknown event: %i (ignored)",
+        opal_output_verbose(2, orte_oob_base_framework.framework_output, "%s mca_oob_tcp_mig_event: received unknown event: %i (ignored)",
                     ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), event);
 
     }
@@ -872,6 +872,9 @@ static void oob_mig_freeze_defreeze(bool defreezing, mca_oob_tcp_peer_t* peer) {
 }
 
 static void mig_app(const char* src, const char* dst) {
+
+    opal_output_verbose(2, orte_oob_base_framework.framework_output, "oob:tcp:mig_app App migration from %s to %s requested", src, dst);
+
     mca_oob_tcp_peer_t *peer_tmp;
     mca_oob_tcp_addr_t *addr;
     uint64_t ui64;
@@ -918,17 +921,17 @@ static void mig_me(bool defreezing) {
 
 	// Let's freeze all peers
 	if (defreezing) {
-    opal_output (0, "%s:oob_tcp_mig_event: defreezing all peers...\n",
+	    opal_output_verbose(2, orte_oob_base_framework.framework_output, "%s:oob_tcp_mig_event: defreezing all peers...\n",
                                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 	} else {
-	    opal_output (0, "%s:oob_tcp_mig_event: freezing all peers...\n",
+	    opal_output_verbose(2, orte_oob_base_framework.framework_output, "%s:oob_tcp_mig_event: freezing all peers...\n",
 	            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 	}
 
     if (OPAL_SUCCESS == opal_hash_table_get_first_key_uint64(&mca_oob_tcp_module.peers, &ui64,
                                                              (void**)&peer_tmp, (void**)&nptr)) {
         opal_output_verbose(2, orte_oob_base_framework.framework_output,
-                            "%s FREEZING PEER OBJ %s",
+                            "%s (DE)FREEZING PEER OBJ %s",
                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
                             (NULL == peer_tmp) ? "NULL" : ORTE_NAME_PRINT(&peer_tmp->name));
         if (NULL != peer_tmp) {

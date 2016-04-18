@@ -147,9 +147,10 @@ int main(int argc, char *argv[])
     int fd_output = opal_output_open(NULL);
     opal_output_set_verbosity(fd_output , 100);
 
-    opal_output(0, "orted-restore: inizialized.");
-
-    fflush(stdout); // Avoid double print during fork
+    if (orte_debug_daemons_flag) {
+        opal_output(0, "orted-restore: inizialized.");
+        fflush(stdout); // Avoid double print during fork
+    }
 
     orte_mig_base_select();
 
@@ -157,8 +158,8 @@ int main(int argc, char *argv[])
         opal_output(0, "orted-restore: failed to restore.");
         exit(1);
     }
-
-    opal_output(0, "orted-restore: end of execution.");
-
+    if (orte_debug_daemons_flag) {
+        opal_output(0, "orted-restore: end of execution.");
+    }
     return 0;
 }

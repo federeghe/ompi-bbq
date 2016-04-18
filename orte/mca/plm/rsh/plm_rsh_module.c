@@ -1689,14 +1689,20 @@ static int rsh_restore(const char *new_hostname, const orte_process_name_t* proc
 
     char **argv = malloc(sizeof(const char*)*8);
 
-    argv[0] = strdup("-t");
-    argv[1] = strdup(new_hostname);
-    argv[2] = strdup("orted-restore");
-    argv[3] = strdup("-debug-daemons");
-    argv[4] = strdup("-mca");
-    argv[5] = strdup("mig_base_verbose");
-    argv[6] = strdup("100");
-    argv[7] = NULL;
+    int i=0;
+
+    argv[i++] = strdup("-t");
+    argv[i++] = strdup(new_hostname);
+    argv[i++] = strdup("orted-restore");
+    if (orte_debug_daemons_flag) {
+        argv[i++] = strdup("-debug-daemons");
+    }
+    if (orte_mig_base_framework.framework_verbose > 0) {
+        argv[i++] = strdup("-mca");
+        argv[i++] = strdup("mig_base_verbose");
+        asprintf(&argv[i++], "%i", orte_mig_base_framework.framework_verbose);
+    }
+    argv[i] = NULL;
 
     caddy = OBJ_NEW(orte_plm_rsh_caddy_t);
     caddy->argc = 3;

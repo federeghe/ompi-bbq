@@ -430,7 +430,6 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
                 if (nptr->daemon != NULL && nptr->daemon_launched && nptr->state == ORTE_NODE_STATE_UP)
                     total++;
             }
-            opal_output(5, "******************* total %i, ack_count %i", total, ack_count);
 
             if (total == ack_count){
 
@@ -455,7 +454,6 @@ void orte_plm_base_recv(int status, orte_process_name_t* sender,
                 if (nptr->daemon != NULL && nptr->daemon_launched && nptr->state == ORTE_NODE_STATE_UP)
                     total++;
             }
-            opal_output(5, "++++++++++++++++ total %i, ack_count %i", total, ack_count);
 
             if (total == ack_count){
 

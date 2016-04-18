@@ -385,7 +385,6 @@ static int mca_btl_tcp_component_open(void)
 
 static int mca_btl_tcp_component_close(void)
 {
-    opal_output(0,"btl:mca_btl_tcp_component_close");
     if (NULL != mca_btl_tcp_component.tcp_if_seq) {
         free(mca_btl_tcp_component.tcp_if_seq);
     }

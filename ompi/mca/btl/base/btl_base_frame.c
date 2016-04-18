@@ -123,8 +123,6 @@ static void orted_btl_freeze_sig(int sig) {
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
                     sm->btl_module->btl_mig_event(mig_state, sm->btl_module);
             }
-            usleep(10000);
-            opal_event_loop(opal_event_base, EVLOOP_ONCE | EVLOOP_NONBLOCK);
 
             kill(getppid(), SIGUSR1);
 
@@ -139,9 +137,6 @@ static void orted_btl_freeze_sig(int sig) {
                     sm->btl_module->btl_mig_event(mig_state, sm->btl_module); 
             }
 
-            usleep(10000);
-            opal_event_loop(opal_event_base, EVLOOP_ONCE | EVLOOP_NONBLOCK);
-
             kill(getppid(), SIGUSR1);
             break;
         case BTL_NOT_MIGRATING_PREPARE:
@@ -150,9 +145,6 @@ static void orted_btl_freeze_sig(int sig) {
             OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
                     sm->btl_module->btl_mig_event(mig_state, sm->btl_module); 
             }
-
-            usleep(10000);
-            opal_event_loop(opal_event_base, EVLOOP_ONCE | EVLOOP_NONBLOCK);
 
             kill(getppid(), SIGUSR1);
             break;

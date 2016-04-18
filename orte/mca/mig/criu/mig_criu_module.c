@@ -182,7 +182,7 @@ static void gen_random(char *s, const int len) {
     s[len] = '\0';
 }
 
-static void sig_child_handler(int s) {
+/*static void sig_child_handler(int s) {
     static int x=0;
     if (s != SIGCLD)
         return; // what's happened here??
@@ -190,9 +190,9 @@ static void sig_child_handler(int s) {
     if (x++ <= 0)
         return; // It is normal that first child dies.
 
-    opal_output(0,"mig:criu sig cld received.");
+    opal_output_verbose(5,orte_mig_base_framework.framework_output,"mig:criu sig cld received.");
     exit(0);    // All ok, bye bye
-}
+}*/
 
 static int orte_mig_criu_restore(void) {
 
@@ -212,21 +212,21 @@ static int orte_mig_criu_restore(void) {
         return ORTE_ERROR;
     }
 
-    opal_output(0,"mig:criu old PID before unshare is %i", getpid());
+    opal_output_verbose(2,orte_mig_base_framework.framework_output,"mig:criu old PID before unshare is %i", getpid());
     unshare(CLONE_NEWPID | CLONE_NEWNS );
     int pid = fork();
     if (pid != 0) {
         int status;
         waitpid(-1, &status, 0);
-        opal_output(0,"mig:criu sig cld received. %i",status);
+        opal_output_verbose(20,orte_mig_base_framework.framework_output,"mig:criu sig cld received. %i",status);
         waitpid(-1, &status, 0);
-        opal_output(0,"mig:criu sig cld received. %i",status);
+        opal_output_verbose(20,orte_mig_base_framework.framework_output,"mig:criu sig cld received. %i",status);
         return status;
     }
 
     /* NO RETURNs BEYOND THIS POINT */
 
-    opal_output(0,"mig:criu new PID after unshare is %i", getpid());
+    opal_output_verbose(2,orte_mig_base_framework.framework_output,"mig:criu new PID after unshare is %i", getpid());
 
 
     if (mount("none", "/proc", NULL, MS_PRIVATE|MS_REC, NULL)) {
