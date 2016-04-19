@@ -770,7 +770,7 @@ int mca_btl_tcp_endpoint_start_connect(mca_btl_base_endpoint_t* btl_endpoint)
     mca_btl_tcp_proc_tosocks(btl_endpoint->endpoint_addr, &endpoint_addr);
 
     opal_output_verbose(20, ompi_btl_base_framework.framework_output, 
-                        "btl: tcp: attempting to connect() to %s address %s on port %d (nfrags %i)",
+                        "btl: tcp: attempting to connect() to %s address %s on port %d (nfrags %l)",
                         OMPI_NAME_PRINT(&btl_endpoint->endpoint_proc->proc_ompi->proc_name),
                         opal_net_get_hostname((struct sockaddr*) &endpoint_addr),
                         ntohs(btl_endpoint->endpoint_addr->addr_port), opal_list_get_size(&btl_endpoint->endpoint_frags));
@@ -868,7 +868,6 @@ static void mca_btl_tcp_endpoint_complete_connect(mca_btl_base_endpoint_t* btl_e
 
 static void mca_btl_tcp_endpoint_recv_handler(int sd, short flags, void* user)
 {   
-    static int sw = 0;
     mca_btl_base_endpoint_t* btl_endpoint = (mca_btl_base_endpoint_t *)user;
     
     /* Make sure we don't have a race between a thread that remove the

@@ -123,6 +123,7 @@ struct mca_btl_tcp_module_t {
     size_t tcp_bytes_recv;
     size_t tcp_send_handler;
 #endif
+
 }; 
 typedef struct mca_btl_tcp_module_t mca_btl_tcp_module_t;
 extern mca_btl_tcp_module_t mca_btl_tcp_module;

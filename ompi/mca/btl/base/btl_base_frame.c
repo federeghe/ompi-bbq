@@ -81,7 +81,7 @@ bool mca_btl_base_thread_multiple_override = false;
 
 #if ORTE_ENABLE_MIGRATION
 
-sighandler_t prev_handler;
+opal_event_t* mig_signal_event=NULL;
 ompi_vpid_t btl_mig_src_vpid;
 char btl_mig_src[30];
 char btl_mig_dst[30];
@@ -232,7 +232,9 @@ static int mca_btl_base_open(mca_base_open_flag_t flags)
   mca_btl_base_verbose = opal_output_get_verbosity(ompi_btl_base_framework.framework_output);
 
 #if ORTE_ENABLE_MIGRATION
-  signal(SIGUSR1,orted_btl_freeze_sig);
+  mig_signal_event = (opal_event_t*)malloc(sizeof(opal_event_t));
+  opal_event_signal_set(orte_event_base, mig_signal_event, SIGUSR1, orted_btl_freeze_sig, NULL);
+  opal_event_signal_add(mig_signal_event, 0);
 #endif
   /* All done */
   return OMPI_SUCCESS;
