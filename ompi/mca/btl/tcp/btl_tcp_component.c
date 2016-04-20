@@ -780,7 +780,7 @@ static int mca_btl_tcp_component_create_listen(uint16_t af_family)
 #endif
 
     {  /* Don't reuse ports */
-        int flg = 1;    // FIXME we set this to 1
+        int flg = 0;    // FIXME we set this to 1
         if (setsockopt (sd, SOL_SOCKET, SO_REUSEADDR, (const char *)&flg, sizeof (flg)) < 0) {
             BTL_ERROR(("mca_btl_tcp_create_listen: unable to unset the "
                        "SO_REUSEADDR option (%s:%d)\n",

@@ -278,16 +278,12 @@ static int orte_mig_criu_restore(void) {
         exit(ORTE_ERROR);
     }
 
-    wait(NULL);
 
     // We have to wait the termination of the restored process to
     // guarantee the output will be forwarded to ssh and then to
-    // hnp. The sleep time is not really important (this time is lost
-    // after the termination of the process)
-/*    while(kill(pid_to_restore, 0) != -1) {
-        opal_output(0, "kill ok\n");
-        sleep(1);
-    }*/
+    // hnp.
+    wait(NULL);
+
 
     exit(ORTE_SUCCESS);
 
