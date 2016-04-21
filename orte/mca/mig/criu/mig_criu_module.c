@@ -56,6 +56,13 @@
 
 #include "criu/criu.h"
 
+#if ORTE_MIG_OVERHEAD_TEST
+    struct timespec dump_s_t;
+    struct timespec dump_e_t;
+    struct timespec restore_s_t;
+    struct timespec restore_e_t;
+#endif
+
 #define RESTORE_PATH_PREFIX "/tmp/ckpt_"
 
 static int init(void);
@@ -64,7 +71,7 @@ static int orte_mig_criu_finalize(void);
 static char *orte_mig_criu_get_name(void);
 static orte_mig_migration_state_t orte_mig_criu_get_state(void);
 static int orte_mig_criu_restore(void);
-static int orte_mig_criu_migrate(char *host, char *, pid_t);
+static int orte_mig_criu_migrate(char* host, char* path, int pid_to_restore);
 /*
  * Global variables
  */
@@ -97,6 +104,10 @@ static int init(void){
 }
 
 static int orte_mig_criu_dump(pid_t fpid){
+    
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &dump_s_t);
+#endif
     int dir;
     
     sprintf(dump_path, "/tmp/ckpt_%d", fpid);
@@ -147,6 +158,14 @@ static int orte_mig_criu_dump(pid_t fpid){
 
 
     mig_state = MIG_MOVING;
+    
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &dump_e_t);
+    opal_output_verbose(0, orte_mig_base_framework.framework_output,
+        "%s #TS B %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+        ((double)dump_e_t.tv_sec + 1.0e-9*dump_e_t.tv_nsec) - 
+        ((double)dump_s_t.tv_sec + 1.0e-9*dump_s_t.tv_nsec));
+#endif
 
     return ORTE_SUCCESS;
 }
@@ -207,6 +226,10 @@ static int orte_mig_criu_restore(void) {
 
 
     int pid_to_restore = orte_mig_base_restore(path);
+    
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &restore_s_t);
+#endif
 
     if ( pid_to_restore < 0 ) {
         return ORTE_ERROR;
@@ -278,6 +301,15 @@ static int orte_mig_criu_restore(void) {
         exit(ORTE_ERROR);
     }
 
+    wait(NULL);
+    
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &restore_e_t);
+    opal_output_verbose(0, orte_mig_base_framework.framework_output,
+        "%s #TS F %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+        ((double)restore_e_t.tv_sec + 1.0e-9*restore_e_t.tv_nsec) - 
+        ((double)restore_s_t.tv_sec + 1.0e-9*restore_s_t.tv_nsec));
+#endif
 
     // We have to wait the termination of the restored process to
     // guarantee the output will be forwarded to ssh and then to

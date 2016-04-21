@@ -46,6 +46,21 @@ typedef struct orte_mig_base_t {
 
 ORTE_DECLSPEC extern orte_mig_base_t orte_mig_base;
 
+
+//#if ORTE_MIG_OVERHEAD_TEST
+///* Timestamps for overhead tests*/
+//    extern struct timespec coordination_s_t;
+//    extern struct timespec coordination_e_t;
+//    extern struct timespec dump_s_t;
+//    extern struct timespec dump_e_t;
+//    extern struct timespec compression_t;
+//    extern struct timespec transfer_t;
+//    extern struct timespec decompression_t;
+//    extern struct timespec restore_t;
+//    extern struct timespec finalization_t;
+//    extern struct timespec done_t;
+//#endif
+
 END_C_DECLS
 
 #endif

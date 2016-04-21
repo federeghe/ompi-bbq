@@ -119,6 +119,9 @@ typedef orte_mig_base_component_2_0_0_t orte_mig_base_component_t;
   MCA_BASE_VERSION_2_0_0, \
   "mig", 2, 0, 0
 
+
+/* Timestamps for overhead tests */
+#define ORTE_MIG_OVERHEAD_TEST 1
         
 END_C_DECLS
 

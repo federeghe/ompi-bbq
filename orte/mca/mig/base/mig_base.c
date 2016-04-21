@@ -55,6 +55,18 @@
 // happens that the ssh session on remote host should be delayed.
 #define RETRY_TIMEOUT 50000
 
+#if ORTE_MIG_OVERHEAD_TEST
+    struct timespec coordination_s_t;
+    struct timespec coordination_e_t;
+    struct timespec compression_s_t;
+    struct timespec compression_e_t;
+    struct timespec transfer_s_t;
+    struct timespec transfer_e_t;
+    struct timespec decompression_s_t;
+    struct timespec decompression_e_t;
+    struct timespec finalization_t;
+#endif
+
 orte_mig_migration_info_t* mig_info=NULL;
 
 static void change_hnp_internal_references(void);
@@ -62,6 +74,10 @@ static void change_hnp_internal_references(void);
 int orte_mig_base_prepare_migration(orte_job_t *jdata,
                                 char *src_name,
                                 char *dest_name){
+    
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &coordination_s_t);
+#endif
 
     if (mig_info != NULL) { // There was a previous migration, let's free the resources
         free(mig_info->src_host);
@@ -109,6 +125,13 @@ int orte_mig_base_prepare_migration(orte_job_t *jdata,
 int orte_mig_base_fwd_info(int flag){
     switch(flag){
         case ORTE_MIG_PREPARE_ACK_FLAG:
+#if ORTE_MIG_OVERHEAD_TEST
+            clock_gettime(CLOCK_MONOTONIC, &coordination_e_t);
+            opal_output_verbose(0, orte_mig_base_framework.framework_output,
+                "%s #TS A %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                ((double)coordination_e_t.tv_sec + 1.0e-9*coordination_e_t.tv_nsec) - 
+                ((double)coordination_s_t.tv_sec + 1.0e-9*coordination_s_t.tv_nsec));
+#endif
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_READY);
             orte_plm.mig_restore(mig_info->dst_host, &(mig_info->src_name));
             orte_plm.mig_event(ORTE_MIG_EXEC, mig_info);
@@ -118,11 +141,17 @@ int orte_mig_base_fwd_info(int flag){
             orte_oob_base_mig_event(ORTE_MIG_EXEC, &(mig_info->src_name));
         break;
         case ORTE_MIG_DONE_FLAG:
+#if ORTE_MIG_OVERHEAD_TEST
+            opal_output_verbose(0, orte_mig_base_framework.framework_output,
+                "%s mig:criu: Started counting finalization time.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+            clock_gettime(CLOCK_MONOTONIC, &finalization_t);
+#endif
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_DONE);
             orte_oob_base_mig_event(ORTE_MIG_DONE, (void*)(mig_info->dst_host));
             change_hnp_internal_references();
             orte_plm.mig_event(ORTE_MIG_DONE, NULL);
-
+            
         break;
         case ORTE_MIG_ABORTED_FLAG:
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_ABORTED);
@@ -166,6 +195,29 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
     struct sockaddr_in addr;
     int socket_fd;
     
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &compression_s_t);
+#endif
+    opal_output_verbose(0,orte_mig_base_framework.framework_output,
+        "%s orted:mig:base Compressing folder...",
+        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    char *cmd;
+    asprintf(&cmd, "tar -P -cf %s %s", TO_SEND_FILE, path);
+    system(cmd);
+    free(cmd);
+    
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &compression_e_t);
+    opal_output_verbose(0, orte_mig_base_framework.framework_output,
+        "%s #TS C %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+        ((double)compression_e_t.tv_sec + 1.0e-9*compression_e_t.tv_nsec) - 
+        ((double)compression_s_t.tv_sec + 1.0e-9*compression_s_t.tv_nsec));
+#endif
+    
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &transfer_s_t);
+#endif
+    
     /* Open socket towards destination node to send dump directory */
     if(0 > (socket_fd = socket(AF_INET,SOCK_STREAM,0)))
     {
@@ -187,16 +239,6 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = inet_addr(cleaned_host);
     addr.sin_port = htons(PORT_MIGRATION_COPY);
-
-    opal_output_verbose(0,orte_mig_base_framework.framework_output,
-                "%s orted:mig:base Compressing folder...",
-                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
-    char *cmd;
-    asprintf(&cmd, "tar -P -cf %s %s", TO_SEND_FILE, path);
-    system(cmd);
-    free(cmd);
-
 
     while(0>connect(socket_fd,(struct sockaddr *)&addr, sizeof(addr)))
     {
@@ -240,6 +282,14 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
 
     free(og_content);
     close(socket_fd);
+    
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &transfer_e_t);
+    opal_output_verbose(0, orte_mig_base_framework.framework_output,
+        "%s #TS D %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+        ((double)transfer_e_t.tv_sec + 1.0e-9*transfer_e_t.tv_nsec) - 
+        ((double)transfer_s_t.tv_sec + 1.0e-9*transfer_s_t.tv_nsec));
+#endif
 
     return ORTE_SUCCESS;
 }
@@ -344,14 +394,26 @@ int orte_mig_base_restore(char *path) {
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:base Decompressing folder...",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-
     
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &decompression_s_t);
+#endif
+
     char *cmd;
     mkdir(path,0700);
     asprintf(&cmd, "tar -P -xf %s -C %s --strip-components=2", TO_UNTAR_FILE, path);
     system(cmd);
     free(cmd);
+    
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &decompression_e_t);
+    opal_output_verbose(0, orte_mig_base_framework.framework_output,
+        "%s #TS E %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+        ((double)decompression_e_t.tv_sec + 1.0e-9*decompression_e_t.tv_nsec) - 
+        ((double)decompression_s_t.tv_sec + 1.0e-9*decompression_s_t.tv_nsec));
+#endif
 
+    
     return pid_to_restore;
 }
 
