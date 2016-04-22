@@ -27,7 +27,6 @@
 #include "btl_tcp.h"
 #include "btl_tcp_frag.h" 
 #include "btl_tcp_proc.h"
-#include "btl_tcp_endpoint.h"
 #include "opal/datatype/opal_convertor.h" 
 #include "ompi/mca/mpool/base/base.h" 
 #include "ompi/mca/mpool/mpool.h" 
@@ -78,7 +77,7 @@ mca_btl_tcp_module_t mca_btl_tcp_module = {
 
 int migration_state = BTL_RUNNING;
 
-static bool is_ep_migrating(mca_btl_base_endpoint_t *endpoint) {
+bool is_ep_migrating(mca_btl_base_endpoint_t *endpoint) {
     int ret;
     ompi_vpid_t *vptr, vpid;
 
@@ -162,6 +161,16 @@ static void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
         switch(migration_state){
             case BTL_MIGRATING_EXEC:
                 OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
+
+                    if (endpoint->endpoint_state == MCA_BTL_TCP_FROZEN && endpoint->endpoint_sd > 0)  {
+                        if(0 != close(endpoint->endpoint_sd)){
+                            opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                                "%s btl:tcp: error while closing socket on %s",
+                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
+                        }
+
+                        endpoint->endpoint_sd = -1;
+                    }
                     if(MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state){
                         if(0 != close(endpoint->endpoint_sd)){
                             opal_output_verbose(0, ompi_btl_base_framework.framework_output,
@@ -175,6 +184,7 @@ static void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
                         endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
                         endpoint->endpoint_sd = -1;
                     }
+
                     if( is_ep_migrating(endpoint) ){
                         endpoint->endpoint_addr->addr_inet._union_inet._addr__inet._addr_inet = address;
                         strcpy(endpoint->endpoint_proc->proc_ompi->proc_hostname, btl_mig_dst);
@@ -183,6 +193,16 @@ static void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
                 break;
             case BTL_NOT_MIGRATING_EXEC:
                 OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
+
+                    if (endpoint->endpoint_state == MCA_BTL_TCP_FROZEN && endpoint->endpoint_sd > 0)  {
+                        if(0 != close(endpoint->endpoint_sd)){
+                            opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                                "%s btl:tcp: error while closing socket on %s",
+                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
+                        }
+
+                        endpoint->endpoint_sd = -1;
+                    }
                     if(is_ep_migrating(endpoint)) {
                         if(MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state) {
                             if(0 != close(endpoint->endpoint_sd)){

@@ -736,6 +736,23 @@ int mca_btl_tcp_endpoint_start_connect(mca_btl_base_endpoint_t* btl_endpoint)
     uint16_t af_family = AF_INET;
     opal_socklen_t addrlen = sizeof(struct sockaddr_in);
 
+    if (OPAL_UNLIKELY(
+           is_ep_migrating(btl_endpoint)
+        || migration_state == BTL_MIGRATING_PREPARE
+        || migration_state == BTL_MIGRATING_EXEC
+        )) {
+        /**
+         * In case we are migrating, we do not want that a new
+         * connection is opened until the migration terminates.
+         * If someone asks to open a new connection, just drop the
+         * request and set the endpoint as frozen. (It will be
+         * resumed after the restore)
+         */
+        btl_endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
+        btl_endpoint->endpoint_sd = -1;
+        return OMPI_SUCCESS;
+    }
+
 #if OPAL_ENABLE_IPV6
     if (AF_INET6 == btl_endpoint->endpoint_addr->addr_family) {
         af_family = AF_INET6;
@@ -770,7 +787,7 @@ int mca_btl_tcp_endpoint_start_connect(mca_btl_base_endpoint_t* btl_endpoint)
     mca_btl_tcp_proc_tosocks(btl_endpoint->endpoint_addr, &endpoint_addr);
 
     opal_output_verbose(20, ompi_btl_base_framework.framework_output, 
-                        "btl: tcp: attempting to connect() to %s address %s on port %d (nfrags %l)",
+                        "btl: tcp: attempting to connect() to %s address %s on port %d (nfrags %li)",
                         OMPI_NAME_PRINT(&btl_endpoint->endpoint_proc->proc_ompi->proc_name),
                         opal_net_get_hostname((struct sockaddr*) &endpoint_addr),
                         ntohs(btl_endpoint->endpoint_addr->addr_port), opal_list_get_size(&btl_endpoint->endpoint_frags));

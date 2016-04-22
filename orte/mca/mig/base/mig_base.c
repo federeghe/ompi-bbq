@@ -64,7 +64,10 @@
     struct timespec transfer_e_t;
     struct timespec decompression_s_t;
     struct timespec decompression_e_t;
-    struct timespec finalization_t;
+    struct timespec finalization_s_t;
+    struct timespec total_s_t;
+    struct timespec total_e_t;
+    struct timespec finalization_e_t;
 #endif
 
 orte_mig_migration_info_t* mig_info=NULL;
@@ -76,6 +79,7 @@ int orte_mig_base_prepare_migration(orte_job_t *jdata,
                                 char *dest_name){
     
 #if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &total_s_t);
     clock_gettime(CLOCK_MONOTONIC, &coordination_s_t);
 #endif
 
@@ -125,33 +129,49 @@ int orte_mig_base_prepare_migration(orte_job_t *jdata,
 int orte_mig_base_fwd_info(int flag){
     switch(flag){
         case ORTE_MIG_PREPARE_ACK_FLAG:
-#if ORTE_MIG_OVERHEAD_TEST
-            clock_gettime(CLOCK_MONOTONIC, &coordination_e_t);
-            opal_output_verbose(0, orte_mig_base_framework.framework_output,
-                "%s #TS A %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
-                ((double)coordination_e_t.tv_sec + 1.0e-9*coordination_e_t.tv_nsec) - 
-                ((double)coordination_s_t.tv_sec + 1.0e-9*coordination_s_t.tv_nsec));
-#endif
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_READY);
             orte_plm.mig_restore(mig_info->dst_host, &(mig_info->src_name));
             orte_plm.mig_event(ORTE_MIG_EXEC, mig_info);
             break;
         case ORTE_MIG_READY_FLAG:
+#if ORTE_MIG_OVERHEAD_TEST
+            clock_gettime(CLOCK_MONOTONIC, &coordination_e_t);
+            fprintf(stdout,
+                "%s #TS A %.5f\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                ((double)coordination_e_t.tv_sec + 1.0e-9*coordination_e_t.tv_nsec) - 
+                ((double)coordination_s_t.tv_sec + 1.0e-9*coordination_s_t.tv_nsec));
+            fflush(stdout);
+#endif
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_ONGOING);
             orte_oob_base_mig_event(ORTE_MIG_EXEC, &(mig_info->src_name));
         break;
         case ORTE_MIG_DONE_FLAG:
 #if ORTE_MIG_OVERHEAD_TEST
-            opal_output_verbose(0, orte_mig_base_framework.framework_output,
-                "%s mig:criu: Started counting finalization time.",
-                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
-            clock_gettime(CLOCK_MONOTONIC, &finalization_t);
+            clock_gettime(CLOCK_MONOTONIC, &finalization_s_t);
 #endif
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_DONE);
             orte_oob_base_mig_event(ORTE_MIG_DONE, (void*)(mig_info->dst_host));
             change_hnp_internal_references();
             orte_plm.mig_event(ORTE_MIG_DONE, NULL);
             
+#if ORTE_MIG_OVERHEAD_TEST
+            clock_gettime(CLOCK_MONOTONIC, &finalization_e_t);
+            fprintf(stdout,
+                "%s #TS G %.5f\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                ((double)finalization_e_t.tv_sec + 1.0e-9*finalization_e_t.tv_nsec) -
+                ((double)finalization_s_t.tv_sec + 1.0e-9*finalization_s_t.tv_nsec));
+            fflush(stdout);
+#endif
+#if ORTE_MIG_OVERHEAD_TEST
+            clock_gettime(CLOCK_MONOTONIC, &total_e_t);
+            fprintf(stdout,
+                "%s #TS T %.5f\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+                ((double)total_e_t.tv_sec + 1.0e-9*total_e_t.tv_nsec) -
+                ((double)total_s_t.tv_sec + 1.0e-9*total_s_t.tv_nsec));
+            fflush(stdout);
+#endif
+
+
         break;
         case ORTE_MIG_ABORTED_FLAG:
             orte_ras_base.active_module->send_mig_info(ORTE_MIG_ABORTED);
@@ -208,16 +228,17 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
     
 #if ORTE_MIG_OVERHEAD_TEST
     clock_gettime(CLOCK_MONOTONIC, &compression_e_t);
-    opal_output_verbose(0, orte_mig_base_framework.framework_output,
-        "%s #TS C %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+    fprintf(stdout,
+        "%s #TS C %.5f\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
         ((double)compression_e_t.tv_sec + 1.0e-9*compression_e_t.tv_nsec) - 
         ((double)compression_s_t.tv_sec + 1.0e-9*compression_s_t.tv_nsec));
+    fflush(stdout);
 #endif
-    
+
 #if ORTE_MIG_OVERHEAD_TEST
     clock_gettime(CLOCK_MONOTONIC, &transfer_s_t);
 #endif
-    
+
     /* Open socket towards destination node to send dump directory */
     if(0 > (socket_fd = socket(AF_INET,SOCK_STREAM,0)))
     {
@@ -248,6 +269,16 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
         usleep(RETRY_TIMEOUT);
         // TODO: Implement max attempts
     }
+
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &transfer_e_t);
+    fprintf(stdout,
+        "%s #TS D(OVH) %.5f\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+        ((double)transfer_e_t.tv_sec + 1.0e-9*transfer_e_t.tv_nsec) -
+        ((double)transfer_s_t.tv_sec + 1.0e-9*transfer_s_t.tv_nsec));
+
+    fflush(stdout);
+#endif
 
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:base Connected to destination node. Sending gzip...",
@@ -282,14 +313,7 @@ int orte_mig_base_migrate(char *host, char *path, pid_t pid_to_restore) {
 
     free(og_content);
     close(socket_fd);
-    
-#if ORTE_MIG_OVERHEAD_TEST
-    clock_gettime(CLOCK_MONOTONIC, &transfer_e_t);
-    opal_output_verbose(0, orte_mig_base_framework.framework_output,
-        "%s #TS D %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
-        ((double)transfer_e_t.tv_sec + 1.0e-9*transfer_e_t.tv_nsec) - 
-        ((double)transfer_s_t.tv_sec + 1.0e-9*transfer_s_t.tv_nsec));
-#endif
+
 
     return ORTE_SUCCESS;
 }
@@ -354,6 +378,10 @@ int orte_mig_base_restore(char *path) {
     size_addr_cl = sizeof(addr_cl);
     socket_cl = accept(socket_fd, (struct sockaddr *) &addr_cl, &size_addr_cl); // Wait until client arrives
 
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &transfer_s_t);
+#endif
+
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:base Accepted source node",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
@@ -382,6 +410,7 @@ int orte_mig_base_restore(char *path) {
 
     close(socket_cl);
 
+
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:base Received %i bytes...",
                 ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), file_size);
@@ -390,6 +419,16 @@ int orte_mig_base_restore(char *path) {
     fwrite(og_content,file_size,1,f);
     fclose(f);
     free(og_content);
+
+#if ORTE_MIG_OVERHEAD_TEST
+    clock_gettime(CLOCK_MONOTONIC, &transfer_e_t);
+    fprintf(stdout,
+        "%s #TS D %.5f\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+        ((double)transfer_e_t.tv_sec + 1.0e-9*transfer_e_t.tv_nsec) -
+        ((double)transfer_s_t.tv_sec + 1.0e-9*transfer_s_t.tv_nsec));
+
+    fflush(stdout);
+#endif
 
     opal_output_verbose(0,orte_mig_base_framework.framework_output,
                 "%s orted:mig:base Decompressing folder...",
@@ -407,10 +446,11 @@ int orte_mig_base_restore(char *path) {
     
 #if ORTE_MIG_OVERHEAD_TEST
     clock_gettime(CLOCK_MONOTONIC, &decompression_e_t);
-    opal_output_verbose(0, orte_mig_base_framework.framework_output,
-        "%s #TS E %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+    fprintf(stdout,
+        "%s #TS E %.5f\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
         ((double)decompression_e_t.tv_sec + 1.0e-9*decompression_e_t.tv_nsec) - 
         ((double)decompression_s_t.tv_sec + 1.0e-9*decompression_s_t.tv_nsec));
+    fflush(stdout);
 #endif
 
     

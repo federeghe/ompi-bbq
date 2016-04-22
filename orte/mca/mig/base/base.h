@@ -61,6 +61,12 @@ ORTE_DECLSPEC extern orte_mig_base_t orte_mig_base;
 //    extern struct timespec done_t;
 //#endif
 
+
+
+/* Timestamps for overhead tests */
+#define ORTE_MIG_OVERHEAD_TEST 1
+
+
 END_C_DECLS
 
 #endif

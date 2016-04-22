@@ -161,10 +161,11 @@ static int orte_mig_criu_dump(pid_t fpid){
     
 #if ORTE_MIG_OVERHEAD_TEST
     clock_gettime(CLOCK_MONOTONIC, &dump_e_t);
-    opal_output_verbose(0, orte_mig_base_framework.framework_output,
-        "%s #TS B %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+    fprintf(stdout,
+        "%s #TS B %.5f\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
         ((double)dump_e_t.tv_sec + 1.0e-9*dump_e_t.tv_nsec) - 
         ((double)dump_s_t.tv_sec + 1.0e-9*dump_s_t.tv_nsec));
+    fflush(stdout);
 #endif
 
     return ORTE_SUCCESS;
@@ -300,15 +301,14 @@ static int orte_mig_criu_restore(void) {
                         ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), pid_to_restore);
         exit(ORTE_ERROR);
     }
-
-    wait(NULL);
     
 #if ORTE_MIG_OVERHEAD_TEST
     clock_gettime(CLOCK_MONOTONIC, &restore_e_t);
-    opal_output_verbose(0, orte_mig_base_framework.framework_output,
-        "%s #TS F %.5f", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
+    fprintf(stdout,
+        "%s #TS F %.5f\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
         ((double)restore_e_t.tv_sec + 1.0e-9*restore_e_t.tv_nsec) - 
         ((double)restore_s_t.tv_sec + 1.0e-9*restore_s_t.tv_nsec));
+    fflush(stdout);
 #endif
 
     // We have to wait the termination of the restored process to
