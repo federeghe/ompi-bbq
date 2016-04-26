@@ -162,21 +162,18 @@ static void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
             case BTL_MIGRATING_EXEC:
                 OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
 
-                    if (endpoint->endpoint_state == MCA_BTL_TCP_FROZEN && endpoint->endpoint_sd > 0)  {
-                        if(0 != close(endpoint->endpoint_sd)){
-                            opal_output_verbose(0, ompi_btl_base_framework.framework_output,
-                                "%s btl:tcp: error while closing socket on %s",
-                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
-                        }
+                    if (
+                       MCA_BTL_TCP_CLOSED != endpoint->endpoint_state &&
+                       MCA_BTL_TCP_FAILED != endpoint->endpoint_state    ) {
 
-                        endpoint->endpoint_sd = -1;
-                    }
-                    if(MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state){
-                        if(0 != close(endpoint->endpoint_sd)){
-                            opal_output_verbose(0, ompi_btl_base_framework.framework_output,
-                                "%s btl:tcp: error while closing socket on %s",
-                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
-                        }
+                        if(endpoint->endpoint_sd > 0) {
+	                        if(0 != close(endpoint->endpoint_sd)) {
+                                opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                                    "%s btl:tcp: error while closing socket on %s sock %i errno %i",
+                                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname,
+         				endpoint->endpoint_sd, errno);
+                                }
+			}
                         if (endpoint->endpoint_recv_event.ev_base != NULL)
                             opal_event_del(&endpoint->endpoint_recv_event);
                         if (endpoint->endpoint_send_event.ev_base != NULL)
@@ -194,21 +191,14 @@ static void mca_btl_tcp_mig_close_sockets(mca_btl_base_module_t* btl){
             case BTL_NOT_MIGRATING_EXEC:
                 OPAL_LIST_FOREACH_SAFE(endpoint, next, &tcp_btl->tcp_endpoints, mca_btl_base_endpoint_t) {
 
-                    if (endpoint->endpoint_state == MCA_BTL_TCP_FROZEN && endpoint->endpoint_sd > 0)  {
-                        if(0 != close(endpoint->endpoint_sd)){
-                            opal_output_verbose(0, ompi_btl_base_framework.framework_output,
-                                "%s btl:tcp: error while closing socket on %s",
-                                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
-                        }
-
-                        endpoint->endpoint_sd = -1;
-                    }
-                    if(is_ep_migrating(endpoint)) {
+                    if(is_ep_migrating(endpoint) || endpoint->endpoint_state == MCA_BTL_TCP_FROZEN) {
                         if(MCA_BTL_TCP_CLOSED != endpoint->endpoint_state && MCA_BTL_TCP_FAILED != endpoint->endpoint_state) {
-                            if(0 != close(endpoint->endpoint_sd)){
-                                opal_output_verbose(0, ompi_btl_base_framework.framework_output,
-                                    "%s btl:tcp: error while closing socket on %s",
-                                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
+                            if(endpoint->endpoint_sd > 0) {
+                                if(0 != close(endpoint->endpoint_sd)){
+                                    opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                                        "%s btl:tcp: error while closing socket on %s",
+                                        ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),endpoint->endpoint_proc->proc_ompi->proc_hostname);
+                                }
                             }
                             if (endpoint->endpoint_recv_event.ev_base != NULL)
                                 opal_event_del(&endpoint->endpoint_recv_event);
