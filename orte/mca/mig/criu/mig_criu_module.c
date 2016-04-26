@@ -129,7 +129,7 @@ static int orte_mig_criu_dump(pid_t fpid){
     criu_set_pid(fpid);
     criu_set_leave_running(false);
     criu_set_tcp_established(true);
-    criu_set_ghost_limit(1024 * 1024 * 1024 * 1024); // 1 TB
+    criu_set_ghost_limit(1024 * 1024 * 1024); // 1 GB
     
     if(0 > (dir = open(dump_path, O_DIRECTORY))){
         opal_output_verbose(0,orte_mig_base_framework.framework_output,
