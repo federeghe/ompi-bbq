@@ -28,6 +28,7 @@
 #include "btl_tcp_frag.h" 
 #include "btl_tcp_proc.h"
 #include "btl_tcp_endpoint.h"
+#include "btl_tcp_mig.h"
 #include "opal/datatype/opal_convertor.h" 
 #include "ompi/mca/mpool/base/base.h" 
 #include "ompi/mca/mpool/mpool.h" 
@@ -63,34 +64,12 @@ mca_btl_tcp_module_t mca_btl_tcp_module = {
         NULL, /* mpool */
         NULL, /* register error */
         mca_btl_tcp_ft_event,
+#if ORTE_ENABLE_MIGRATION
         mca_btl_tcp_mig_event
+#endif
     }
 };
 
-#if ORTE_ENABLE_MIGRATION
-char hostname[20]; //Source/destination node hostname
-bool itsme;
-
-int mca_btl_tcp_mig_event(int event, void *data){
-    switch(event){
-        case BTL_MIGRATING_START:
-            itsme = true;
-            break;
-        case BTL_NOT_MIGRATING_START:
-            itsme = false;
-            strcpy(hostname,(const char *)data);
-            break;
-        case BTL_MIGRATING_END:
-            itsme = true;
-            break;
-        case BTL_NOT_MIGRATING_END:
-            itsme = false;
-            break;
-        default:
-            return;
-    }
-}
-#endif
 
 /**
  *

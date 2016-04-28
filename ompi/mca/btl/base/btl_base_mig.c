@@ -30,6 +30,9 @@ mca_btl_base_mig_info_t* mca_btl_base_mig_info = NULL;
 static void mca_btl_base_mig_signal(int);
 static bool mca_btl_base_mig_read_info(void);
 
+int mca_btl_tcp_component_exchange(void); // In TCP component
+
+
 /* ** FUNCTIONS ** */
 void mca_btl_base_mig_init(void)
 {
@@ -81,7 +84,7 @@ static void mca_btl_base_mig_signal(int sig) {
         // Foreach active BTL module, call the mig_event.
         OPAL_LIST_FOREACH_SAFE(selected_module, it_selected_module, &mca_btl_base_modules_initialized,
                                mca_btl_base_selected_module_t) {
-                selected_module->btl_module->btl_mig_event(current_mig_state, selected_module->btl_module);
+                selected_module->btl_module->btl_mig_event(selected_module->btl_module, current_mig_state,mca_btl_base_mig_info);
         }
 
         // Now I can send back the ACK to my orted
@@ -101,7 +104,7 @@ static void mca_btl_base_mig_signal(int sig) {
             // Foreach active BTL module, call the mig_event.
             OPAL_LIST_FOREACH_SAFE(selected_module, it_selected_module, &mca_btl_base_modules_initialized,
                                    mca_btl_base_selected_module_t) {
-                    selected_module->btl_module->btl_mig_event(current_mig_state, selected_module->btl_module);
+                    selected_module->btl_module->btl_mig_event(selected_module->btl_module, current_mig_state,mca_btl_base_mig_info);
             }
 
             // Now I can send back the ACK to my orted
@@ -117,6 +120,9 @@ static void mca_btl_base_mig_signal(int sig) {
                 // the hostname printed for debugging purpose
                 opal_output_renew_hostname();
 
+                // Send to all nodes the information about my new IPs
+                mca_btl_tcp_component_exchange();
+
                 // As before call the under layer oob to issue "DONE"
                 orte_oob_base_mig_event(ORTE_MIG_DONE_APP, NULL);
             }
@@ -124,7 +130,7 @@ static void mca_btl_base_mig_signal(int sig) {
             // Foreach active BTL module, call the mig_event.
             OPAL_LIST_FOREACH_SAFE(selected_module, it_selected_module, &mca_btl_base_modules_initialized,
                                    mca_btl_base_selected_module_t) {
-                    selected_module->btl_module->btl_mig_event(current_mig_state, selected_module->btl_module);
+                    selected_module->btl_module->btl_mig_event(selected_module->btl_module, current_mig_state,mca_btl_base_mig_info);
             }
 
 
@@ -182,5 +188,14 @@ bool mca_btl_base_mig_am_i_migrating(void) {
     return false;
 }
 
+bool mca_btl_base_mig_is_migrating(ompi_vpid_t vpid) {
+    if (mca_btl_base_mig_info != NULL) {
+        // Migration in progress...
+        if (mca_btl_base_mig_info->src_vpid == vpid) {
+            return true;
+        }
+    }
+    return false;
+}
 
 #endif // ORTE_ENABLE_MIGRATION

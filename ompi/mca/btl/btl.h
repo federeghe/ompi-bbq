@@ -128,6 +128,8 @@
 #include "opal/mca/crs/crs.h"
 #include "opal/mca/crs/base/base.h"
 
+#include "ompi/mca/btl/base/btl_base_mig.h"
+
 BEGIN_C_DECLS
 
 /*
@@ -797,11 +799,15 @@ typedef int (*mca_btl_base_module_ft_event_fn_t)(int state);
 #if ORTE_ENABLE_MIGRATION
 /**
  * Migration notification function
- * @param event Event type
- * @param data Data to be processed according to the event
+ * @param mig_status status of migration
+ * @param mig_info migration info structure
  * @return OMPI_SUCCESS or failure status
  */
-typedef int (*mca_btl_base_module_mig_event_fn_t)(int event, void *data);
+typedef int (*mca_btl_base_module_mig_event_fn_t)(
+    struct mca_btl_base_module_t* btl,
+    mca_btl_base_mig_status_t mig_status,
+    mca_btl_base_mig_info_t* mig_info
+);
 #endif
 
 /**

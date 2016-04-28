@@ -905,7 +905,7 @@ static int mca_btl_tcp_component_create_listen(uint16_t af_family)
  *  will make this available to all peers. 
  */
 
-static int mca_btl_tcp_component_exchange(void)
+int mca_btl_tcp_component_exchange(void)
 {
      int rc = 0, index;
      size_t i = 0;

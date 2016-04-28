@@ -118,7 +118,6 @@ OBJ_CLASS_INSTANCE(
 
 static void mca_btl_tcp_endpoint_construct(mca_btl_base_endpoint_t* btl_endpoint);
 static void mca_btl_tcp_endpoint_destruct(mca_btl_base_endpoint_t* btl_endpoint);
-static int  mca_btl_tcp_endpoint_start_connect(mca_btl_base_endpoint_t*);
 static void mca_btl_tcp_endpoint_connected(mca_btl_base_endpoint_t*);
 static void mca_btl_tcp_endpoint_recv_handler(int sd, short flags, void* user);
 static void mca_btl_tcp_endpoint_send_handler(int sd, short flags, void* user);
@@ -705,7 +704,7 @@ void mca_btl_tcp_set_socket_options(int sd)
  *  our globally unique process identifier to the endpoint and wait for
  *  the endpoints response.
  */
-static int mca_btl_tcp_endpoint_start_connect(mca_btl_base_endpoint_t* btl_endpoint)
+int mca_btl_tcp_endpoint_start_connect(mca_btl_base_endpoint_t* btl_endpoint)
 {
     int rc,flags;
     struct sockaddr_storage endpoint_addr;
@@ -1016,4 +1015,35 @@ static void mca_btl_tcp_endpoint_send_handler(int sd, short flags, void* user)
 }
 
 
+void mca_btl_tcp_endpoint_set_blocking (mca_btl_base_endpoint_t* btl_endpoint, bool blocking) {
+    int flags;
+
+    if (btl_endpoint->endpoint_sd < 0) {
+        opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+            "%s btl:tcp: WARNING: trying to set_blocking(%i) on invalid socket.",
+            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), blocking);
+        return;
+    }
+
+    /* setup the socket as non-blocking */
+    if((flags = fcntl(btl_endpoint->endpoint_sd, F_GETFL, 0)) < 0) {
+        opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+            "%s btl:tcp: WARNING: fcntl(F_GETFL) failed: %s.",
+            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), strerror(opal_socket_errno));
+        return;
+    } else {
+        if (blocking) {
+            // blocking
+            flags &= ~O_NONBLOCK;
+        } else {
+            flags |= O_NONBLOCK;
+        }
+        if(fcntl(btl_endpoint->endpoint_sd, F_SETFL, flags) < 0) {
+            opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                "%s btl:tcp: WARNING: fcntl(F_SETFL) failed: %s.",
+                ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), strerror(opal_socket_errno));
+            return;
+        }
+    }
+}
 

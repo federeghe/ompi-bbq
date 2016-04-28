@@ -12,7 +12,7 @@
 
 #include "opal/mca/mca.h"
 #include "opal/mca/base/base.h"
-#include "ompi/mca/btl/btl.h"
+#include "ompi/mca/rte/rte.h"
 
 
 #if ORTE_ENABLE_MIGRATION
@@ -36,6 +36,7 @@ typedef struct mca_btl_base_mig_info_s {
 
 OMPI_DECLSPEC extern void mca_btl_base_mig_init(void);
 OMPI_DECLSPEC extern bool mca_btl_base_mig_am_i_migrating(void);
+OMPI_DECLSPEC extern bool mca_btl_base_mig_is_migrating(ompi_vpid_t vpid);
 
 
 #endif // ORTE_ENABLE_MIGRATION
