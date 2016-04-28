@@ -26,4 +26,5 @@ libmca_btl_la_SOURCES += \
         base/btl_base_frame.c \
         base/btl_base_error.c \
         base/btl_base_select.c \
-        base/btl_base_mca.c
+        base/btl_base_mca.c \
+        base/btl_base_mig.c

@@ -29,6 +29,8 @@
 
 #include "ompi/mca/btl/btl.h"
 #include "ompi/mca/btl/base/base.h"
+#include "ompi/mca/btl/base/btl_base_mig.h"
+
 
 mca_btl_active_message_callback_t mca_btl_base_active_message_trigger[MCA_BTL_TAG_MAX];
 
@@ -132,6 +134,11 @@ static int mca_btl_base_open(mca_base_open_flag_t flags)
 
   /* get the verbosity so that BTL_VERBOSE will work */
   mca_btl_base_verbose = opal_output_get_verbosity(ompi_btl_base_framework.framework_output);
+
+#if ORTE_ENABLE_MIGRATION
+  /* Init the migration module */
+  mca_btl_base_mig_init();
+#endif
 
   /* All done */
   return OMPI_SUCCESS;

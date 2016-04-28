@@ -217,21 +217,6 @@ typedef uint8_t mca_btl_base_tag_t;
 #define MCA_BTL_ERROR_FLAGS_NONFATAL 0x2
 #define MCA_BTL_ERROR_FLAGS_ADD_CUDA_IPC 0x4
 
-#if ORTE_ENABLE_MIGRATION
-/* Migration-related constants*/
-#define BTL_MIGRATING_PREPARE       0
-#define BTL_NOT_MIGRATING_PREPARE   1
-#define BTL_MIGRATING_EXEC          2
-#define BTL_NOT_MIGRATING_EXEC      3
-#define BTL_MIGRATING_DONE          4
-#define BTL_NOT_MIGRATING_DONE      5
-#define BTL_RUNNING                 6
-
-extern char btl_mig_src[30];
-extern char btl_mig_dst[30];
-extern ompi_vpid_t btl_mig_src_vpid;
-
-#endif
 
 /**
  * Asynchronous callback function on completion of an operation.
