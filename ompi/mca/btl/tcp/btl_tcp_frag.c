@@ -124,11 +124,6 @@ bool mca_btl_tcp_frag_send(mca_btl_tcp_frag_t* frag, int sd)
     while(cnt < 0) {
         cnt = writev(sd, frag->iov_ptr, frag->iov_cnt);
         if(cnt < 0) {
-
-            if (MCA_BTL_TCP_FROZEN == frag->endpoint->endpoint_state) {
-                return false;
-            }
-
             switch(opal_socket_errno) {
             case EINTR:
                 continue;
@@ -218,41 +213,32 @@ bool mca_btl_tcp_frag_recv(mca_btl_tcp_frag_t* frag, int sd)
     cnt = -1;
     while( cnt < 0 ) {
         cnt = readv(sd, frag->iov_ptr, num_vecs);
-        if( 0 < cnt )
-            goto advance_iov_position;
-
-#if ORTE_ENABLE_MIGRATION
-            if(btl_endpoint->endpoint_state == MCA_BTL_TCP_FROZEN){
-                opal_event_del(&btl_endpoint->endpoint_recv_event);
-                return false;
-            }
-#endif
-        if( cnt == 0 ) {
-            btl_endpoint->endpoint_state = MCA_BTL_TCP_FROZEN;
-            opal_event_del(&btl_endpoint->endpoint_recv_event);
-
-            return false;
-        }
-        switch(opal_socket_errno) {
-        case EINTR:
-            continue;
-        case EWOULDBLOCK:
-            return false;
-        case EFAULT:
+	if( 0 < cnt ) goto advance_iov_position;
+	if( cnt == 0 ) {
+            btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
+	    mca_btl_tcp_endpoint_close(btl_endpoint);
+	    return false;
+	}
+	switch(opal_socket_errno) {
+	case EINTR:
+	    continue;
+	case EWOULDBLOCK:
+	    return false;
+	case EFAULT:
             BTL_ERROR(("mca_btl_tcp_frag_recv: readv error (%p, %lu)\n\t%s(%lu)\n",
-                           frag->iov_ptr[0].iov_base, (unsigned long) frag->iov_ptr[0].iov_len,
-                           strerror(opal_socket_errno), (unsigned long) frag->iov_cnt));
+                       frag->iov_ptr[0].iov_base, (unsigned long) frag->iov_ptr[0].iov_len,
+                       strerror(opal_socket_errno), (unsigned long) frag->iov_cnt));
             btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
-            mca_btl_tcp_endpoint_close(btl_endpoint);
-            return false;
-        default:
-            BTL_ERROR(("mca_btl_tcp_frag_recv: readv failed: %s (%d)",
-                           strerror(opal_socket_errno),
-                           opal_socket_errno));
+	    mca_btl_tcp_endpoint_close(btl_endpoint);
+	    return false;
+	default:
+            BTL_ERROR(("mca_btl_tcp_frag_recv: readv failed: %s (%d)", 
+                       strerror(opal_socket_errno),
+                       opal_socket_errno));
             btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
-            mca_btl_tcp_endpoint_close(btl_endpoint);
-            return false;
-        }
+	    mca_btl_tcp_endpoint_close(btl_endpoint);
+	    return false;
+	}
     };
 
  advance_iov_position:

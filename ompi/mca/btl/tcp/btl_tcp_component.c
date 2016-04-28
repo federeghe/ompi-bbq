@@ -780,7 +780,7 @@ static int mca_btl_tcp_component_create_listen(uint16_t af_family)
 #endif
 
     {  /* Don't reuse ports */
-        int flg = 0;    // FIXME we set this to 1
+        int flg = 0;
         if (setsockopt (sd, SOL_SOCKET, SO_REUSEADDR, (const char *)&flg, sizeof (flg)) < 0) {
             BTL_ERROR(("mca_btl_tcp_create_listen: unable to unset the "
                        "SO_REUSEADDR option (%s:%d)\n",
@@ -1132,7 +1132,6 @@ static void mca_btl_tcp_component_recv_handler(int sd, short flags, void* user)
     /* recv the process identifier */
     retval = recv(sd, (char *)&guid, sizeof(guid), 0);
     if(retval != sizeof(guid)) {
-        opal_output(0,"btl:mca_btl_tcp_component_recv_handler: retval!=guid");
         CLOSE_THE_SOCKET(sd);
         return;
     }
@@ -1153,7 +1152,6 @@ static void mca_btl_tcp_component_recv_handler(int sd, short flags, void* user)
     /* lookup the corresponding process */
     btl_proc = mca_btl_tcp_proc_lookup(&guid);
     if(NULL == btl_proc) {
-        opal_output(0,"btl:mca_btl_tcp_component_recv_handler: btl_proc==NULL");
         CLOSE_THE_SOCKET(sd);
         return;
     }

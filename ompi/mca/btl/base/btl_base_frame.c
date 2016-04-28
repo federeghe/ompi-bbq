@@ -30,9 +30,6 @@
 #include "ompi/mca/btl/btl.h"
 #include "ompi/mca/btl/base/base.h"
 
-#include "orte/mca/mig/mig_types.h"
-#include "orte/mca/oob/base/base.h"
-
 mca_btl_active_message_callback_t mca_btl_base_active_message_trigger[MCA_BTL_TAG_MAX];
 
 /*
@@ -78,101 +75,6 @@ char* mca_btl_base_exclude = NULL;
 int mca_btl_base_warn_component_unused = 1;
 opal_list_t mca_btl_base_modules_initialized;
 bool mca_btl_base_thread_multiple_override = false;
-
-#if ORTE_ENABLE_MIGRATION
-
-opal_event_t* mig_signal_event=NULL;
-ompi_vpid_t btl_mig_src_vpid;
-char btl_mig_src[30];
-char btl_mig_dst[30];
-
-// Orted signal to freeze btl connections
-static void orted_btl_freeze_sig(int sig) {
-
-    static int mig_state = BTL_RUNNING;
-    FILE *mig_info_f;
-    char filename[40];
-    static uint32_t src_jobid;
-    mca_btl_base_selected_module_t *sm, *next;
-    
-    if (OPAL_UNLIKELY(sig != SIGUSR1)) {
-        // ???
-        return;
-    }
-    switch(mig_state){
-        case BTL_RUNNING:
-
-            /* Migration hasn't started yet. We need to tell all endpoints to stop communicating.*/
-            sprintf(filename,"/tmp/orted_mig_nodes_%i",getppid());
-            if(NULL == (mig_info_f = fopen(filename,"r"))){
-                fprintf(stdout, "Cannot open orte_mig_nodes file, aborting...\n");
-                fflush(stdout);
-                return;
-            }
-
-            fscanf(mig_info_f,"%u %u %s %s",&src_jobid,&btl_mig_src_vpid,btl_mig_src,btl_mig_dst);
-
-            fclose(mig_info_f);
-            
-            mig_state = (btl_mig_src_vpid == OMPI_RTE_MY_NODEID ? BTL_MIGRATING_PREPARE : BTL_NOT_MIGRATING_PREPARE);
-            
-            if (mig_state == BTL_MIGRATING_PREPARE) {
-                orte_oob_base_mig_event(ORTE_MIG_PREPARE_APP, strchr(btl_mig_src, '@')+1);
-            }
-
-            OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
-                    sm->btl_module->btl_mig_event(mig_state, sm->btl_module);
-            }
-
-            kill(getppid(), SIGUSR1);
-
-            break;
-        case BTL_MIGRATING_PREPARE:
-
-            mig_state = BTL_MIGRATING_EXEC;
-
-            orte_oob_base_mig_event(ORTE_MIG_EXEC_APP, strchr(btl_mig_dst, '@')+1);
-
-            OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
-                    sm->btl_module->btl_mig_event(mig_state, sm->btl_module); 
-            }
-
-            kill(getppid(), SIGUSR1);
-            break;
-        case BTL_NOT_MIGRATING_PREPARE:
-            mig_state = BTL_NOT_MIGRATING_EXEC;
-
-            OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
-                    sm->btl_module->btl_mig_event(mig_state, sm->btl_module); 
-            }
-
-            kill(getppid(), SIGUSR1);
-            break;
-        case BTL_MIGRATING_EXEC:
-            // Redo the inizilization of opal_output in order to change
-            // the hostname printed for debugging purpose
-            opal_output_renew_hostname();
-            mig_state = BTL_MIGRATING_DONE;
-            orte_oob_base_mig_event(ORTE_MIG_DONE_APP, NULL);
-
-            OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
-                    sm->btl_module->btl_mig_event(mig_state, sm->btl_module);
-            }
-            mig_state = BTL_RUNNING;
-            break;
-        case BTL_NOT_MIGRATING_EXEC:
-            mig_state = BTL_NOT_MIGRATING_DONE;
-            OPAL_LIST_FOREACH_SAFE(sm, next, &mca_btl_base_modules_initialized, mca_btl_base_selected_module_t) {
-                    sm->btl_module->btl_mig_event(mig_state, sm->btl_module);
-            }
-            mig_state = BTL_RUNNING;
-            break;
-        default:
-            ;
-    }
-}
-#endif
-
 
 static int mca_btl_base_register(mca_base_register_flag_t flags)
 {
@@ -231,11 +133,6 @@ static int mca_btl_base_open(mca_base_open_flag_t flags)
   /* get the verbosity so that BTL_VERBOSE will work */
   mca_btl_base_verbose = opal_output_get_verbosity(ompi_btl_base_framework.framework_output);
 
-#if ORTE_ENABLE_MIGRATION
-  mig_signal_event = (opal_event_t*)malloc(sizeof(opal_event_t));
-  opal_event_signal_set(orte_event_base, mig_signal_event, SIGUSR1, orted_btl_freeze_sig, NULL);
-  opal_event_signal_add(mig_signal_event, 0);
-#endif
   /* All done */
   return OMPI_SUCCESS;
 }

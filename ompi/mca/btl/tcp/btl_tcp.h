@@ -41,7 +41,6 @@
 #include "ompi/mca/mpool/mpool.h"
 #include "ompi/mca/btl/btl.h"
 #include "opal/class/opal_hash_table.h"
-#include "btl_tcp_endpoint.h"
 
 #define MCA_BTL_TCP_STATISTICS 0
 BEGIN_C_DECLS
@@ -124,7 +123,6 @@ struct mca_btl_tcp_module_t {
     size_t tcp_bytes_recv;
     size_t tcp_send_handler;
 #endif
-
 }; 
 typedef struct mca_btl_tcp_module_t mca_btl_tcp_module_t;
 extern mca_btl_tcp_module_t mca_btl_tcp_module;
@@ -326,15 +324,12 @@ extern mca_btl_base_descriptor_t* mca_btl_tcp_prepare_dst(
 int mca_btl_tcp_ft_event(int state);
 
 #if ORTE_ENABLE_MIGRATION
-extern int migration_state;
 /**
  * Migration event notification function. Called by signal mgmt routine in btl_base_frame.
  * @param event Event type
  * @return OMPI_SUCCESS or failure status
  */
 extern int mca_btl_tcp_mig_event(int event, void *data);
-extern bool is_ep_migrating(mca_btl_base_endpoint_t *endpoint);
-
 #endif
 
 END_C_DECLS
