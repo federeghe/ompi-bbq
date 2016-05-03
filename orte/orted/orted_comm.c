@@ -1256,7 +1256,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         if (signal_child_event != NULL)
             opal_event_signal_del(signal_child_event);
 
-        if(!ORTE_PROC_IS_HNP){
+        if(!ORTE_PROC_IS_HNP){ // TODO: is it necessary?
             if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, SIGUSR1))) {
                 ORTE_ERROR_LOG(ret);
             }
@@ -1279,6 +1279,7 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 #if ORTE_ENABLE_MIGRATION
 
 // Called by orted-restore signal when we are restoring
+// Executed only by the migrating orted
 static void orted_mig_restore_sig(int sig) {
     if (OPAL_UNLIKELY(sig != SIGUSR2)) {
         // ???
@@ -1295,14 +1296,37 @@ static void orted_mig_restore_sig(int sig) {
     // Reopen connection towards HNP
     orte_oob_base_mig_event(ORTE_MIG_DONE, NULL);
 
-    // Declare some variables to send the done flag
+
+    // Declare a lot of variables here
+    bool found=false;
+    orte_proc_t* waiting_child;
     orte_daemon_cmd_flag_t command;
-    int ret;
+    int i, ret;
     opal_buffer_t *answer;
     uint8_t flag;
 
-    // Ehy HNP, I'm alive!
-    SEND_MIG_ACK(ORTE_MIG_DONE_FLAG);
+
+    for (i=0; i < orte_local_children->size; i++) {
+
+        if (NULL == (waiting_child=opal_pointer_array_get_item(orte_local_children, i))) {
+            continue;
+        }
+
+        found=true;
+        break;
+    }
+
+
+    if(!found){
+        //No children, send ack immediately
+        // Migrated orted without children (?)
+        SEND_MIG_ACK(ORTE_MIG_DONE_FLAG);
+    }else{
+        if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(&waiting_child->name, SIGUSR1))) {
+            ORTE_ERROR_LOG(ret);
+        }
+    }
+
 }
 
 static void orted_mig_child_ack_sig(int sig) {
@@ -1345,6 +1369,10 @@ static void orted_mig_child_ack_sig(int sig) {
                 SEND_MIG_ACK(ORTE_MIG_READY_FLAG);
                 opal_output(0, "%s orted: READY_ACK sent to HNP", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
                 break;
+            case ORTE_DAEMON_MIG_DONE:
+                // Ehy HNP, I'm alive!
+                SEND_MIG_ACK(ORTE_MIG_DONE_FLAG);
+            break;
             default:
                 ;
         }

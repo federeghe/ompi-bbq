@@ -69,7 +69,9 @@
 #include "btl_tcp_addr.h"
 #include "btl_tcp_proc.h"
 #include "btl_tcp_frag.h"
-#include "btl_tcp_endpoint.h" 
+#include "btl_tcp_endpoint.h"
+#include "opal/mca/if/if.h"
+
 #if OPAL_CUDA_SUPPORT
 #include "ompi/mca/common/cuda/common_cuda.h"
 #endif /* OPAL_CUDA_SUPPORT */

@@ -30,9 +30,6 @@ mca_btl_base_mig_info_t* mca_btl_base_mig_info = NULL;
 static void mca_btl_base_mig_signal(int);
 static bool mca_btl_base_mig_read_info(void);
 
-int mca_btl_tcp_component_exchange(void); // In TCP component
-
-
 /* ** FUNCTIONS ** */
 void mca_btl_base_mig_init(void)
 {
@@ -120,24 +117,30 @@ static void mca_btl_base_mig_signal(int sig) {
                 // the hostname printed for debugging purpose
                 opal_output_renew_hostname();
 
-                // Send to all nodes the information about my new IPs
-                mca_btl_tcp_component_exchange();
-
                 // As before call the under layer oob to issue "DONE"
                 orte_oob_base_mig_event(ORTE_MIG_DONE_APP, NULL);
+
+                // Send to all nodes the information about my new IPs
+                OPAL_LIST_FOREACH_SAFE(selected_module, it_selected_module, &mca_btl_base_modules_initialized,
+                                       mca_btl_base_selected_module_t) {
+                        selected_module->btl_module->btl_mig_event(selected_module->btl_module, BTL_MIG_EXEC_AFTER_MIGRATION,mca_btl_base_mig_info);
+                }
+
+                // Wait for next signal to procede
+                break;
             }
 
-            // Foreach active BTL module, call the mig_event.
-            OPAL_LIST_FOREACH_SAFE(selected_module, it_selected_module, &mca_btl_base_modules_initialized,
-                                   mca_btl_base_selected_module_t) {
-                    selected_module->btl_module->btl_mig_event(selected_module->btl_module, current_mig_state,mca_btl_base_mig_info);
-            }
-
-
-      // No break here: we do not receive a signal after the done, so perform the clean up operations
-      // and return to RUNNING state.
+      // No break here! If I am not the migrating node, I can restart immediately BTL connections
       case BTL_MIG_DONE:
-        current_mig_state = BTL_MIG_RUNNING;
+
+          // Now I can safely restart the btl
+          // Foreach active BTL module, call the mig_event.
+          OPAL_LIST_FOREACH_SAFE(selected_module, it_selected_module, &mca_btl_base_modules_initialized,
+                                 mca_btl_base_selected_module_t) {
+                  selected_module->btl_module->btl_mig_event(selected_module->btl_module, current_mig_state,mca_btl_base_mig_info);
+          }
+
+          current_mig_state = BTL_MIG_RUNNING;
 
         free(mca_btl_base_mig_info->src_hostname);
         free(mca_btl_base_mig_info->dst_hostname);

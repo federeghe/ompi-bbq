@@ -13,15 +13,16 @@
 #define BBQ_CMD_TERMINATE 2
 
 /* MIG-related commands*/
-#define BBQ_CMD_MIGRATE 3
-#define BBQ_CMD_MIGRATION_READY 4
-#define BBQ_CMD_MIGRATION_ONGOING 5
-#define BBQ_CMD_MIGRATION_ABORTED 6
+#define BBQ_CMD_MIGRATE             3
+#define BBQ_CMD_MIGRATION_READY     4
+#define BBQ_CMD_MIGRATION_ONGOING   5
+#define BBQ_CMD_MIGRATION_ABORTED   6
 #define BBQ_CMD_MIGRATION_SUCCEEDED 7
 
-/* Options */
-#define BBQ_OPT_MIG_AVAILABLE 1 /* ras -> bbq */
-#define BBQ_OPT_PREDUMP_REQ 2   /* bbq -> ras */
+/* Options (maintain 2^n) */
+#define BBQ_OPT_MIG_AVAILABLE   1 /* ras -> bbq */
+#define BBQ_OPT_PREDUMP_REQ     2   /* bbq -> ras */
+#define BBQ_OPT_COMPRESSION_REQ 4
 
 #include <stdint.h>
 
@@ -30,7 +31,6 @@ struct local_bbq_cmd_t {
 	uint32_t jobid;			/* The jobid  */
 	uint8_t cmd_type;		/* Command number: */
     uint8_t flags;          /* Flags */
-							/* Other things here? */
 };
 typedef struct local_bbq_cmd_t local_bbq_cmd_t;
 

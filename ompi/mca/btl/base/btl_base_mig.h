@@ -23,6 +23,7 @@ typedef enum mca_btl_base_mig_status_e {
     BTL_MIG_RUNNING,
     BTL_MIG_PREPARE,
     BTL_MIG_EXEC,
+    BTL_MIG_EXEC_AFTER_MIGRATION,   // Only for migrating procs
     BTL_MIG_DONE
 } mca_btl_base_mig_status_t;
 
