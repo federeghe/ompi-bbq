@@ -1256,12 +1256,10 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
         if (signal_child_event != NULL)
             opal_event_signal_del(signal_child_event);
 
-        if(!ORTE_PROC_IS_HNP){ // TODO: is it necessary?
-            if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, SIGUSR1))) {
-                ORTE_ERROR_LOG(ret);
-            }
+        if (ORTE_SUCCESS != (ret = orte_odls.signal_local_procs(NULL, SIGUSR1))) {
+            ORTE_ERROR_LOG(ret);
         }
-
+        // In this case I'm not interested in the ack back (they are not actually sent)
         break;
     break;
 #endif
@@ -1317,8 +1315,8 @@ static void orted_mig_restore_sig(int sig) {
     }
 
 
-    if(!found){
-        //No children, send ack immediately
+    if(OPAL_UNLIKELY(!found)){
+        // No children, send ack immediately
         // Migrated orted without children (?)
         SEND_MIG_ACK(ORTE_MIG_DONE_FLAG);
     }else{
