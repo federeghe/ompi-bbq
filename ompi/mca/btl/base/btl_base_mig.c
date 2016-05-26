@@ -8,11 +8,13 @@
  */
 
 #include "opal/include/opal_config.h"
+#include "opal/util/stacktrace.h"
 #include "ompi/mca/btl/base/btl_base_mig.h"
 #include "ompi/mca/btl/base/btl_base_error.h"
 #include "ompi/mca/btl/base/base.h"
 #include "orte/mca/oob/base/base.h"
 #include "orte/mca/mig/mig_types.h"
+
 
 #include <signal.h>
 #include <stdio.h>
@@ -116,15 +118,24 @@ static void mca_btl_base_mig_signal(int sig) {
                 // Redo the inizilization of opal_output in order to change
                 // the hostname printed for debugging purpose
                 opal_output_renew_hostname();
+                opal_util_refresh_stackhostname();
 
                 // As before call the under layer oob to issue "DONE"
                 orte_oob_base_mig_event(ORTE_MIG_DONE_APP, NULL);
+
+                opal_output_verbose(20, ompi_btl_base_framework.framework_output,
+                                    "btl:base: BTL_MIG_EXEC_AFTER_MIGRATION");
 
                 // Send to all nodes the information about my new IPs
                 OPAL_LIST_FOREACH_SAFE(selected_module, it_selected_module, &mca_btl_base_modules_initialized,
                                        mca_btl_base_selected_module_t) {
                         selected_module->btl_module->btl_mig_event(selected_module->btl_module, BTL_MIG_EXEC_AFTER_MIGRATION,mca_btl_base_mig_info);
                 }
+
+                opal_output_verbose(20, ompi_btl_base_framework.framework_output,
+                                    "btl:base: (restored proc) sending back last ACK to orted.");
+                // Now I can send back the ACK to my orted
+                kill(getppid(), MIGRATION_ACK_SIGNAL);
 
                 // Wait for next signal to procede
                 break;
@@ -142,8 +153,14 @@ static void mca_btl_base_mig_signal(int sig) {
 
           current_mig_state = BTL_MIG_RUNNING;
 
-        free(mca_btl_base_mig_info->src_hostname);
-        free(mca_btl_base_mig_info->dst_hostname);
+          free(mca_btl_base_mig_info->src_hostname);
+          free(mca_btl_base_mig_info->dst_hostname);
+      break;
+
+      default:
+          opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                              "%s btl:base: mig state %i unexpected.",
+                              ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), current_mig_state);
       break;
     }
 

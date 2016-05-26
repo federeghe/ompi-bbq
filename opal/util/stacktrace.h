@@ -48,4 +48,13 @@ OPAL_DECLSPEC char *opal_stackframe_output_string(void);
  */
 OPAL_DECLSPEC int opal_util_register_stackhandlers (void);
 
+/**
+ * Update the internal value of hostname (e.g. after migration)
+ *
+ *  @returnvalue OPAL_SUCCESS
+ *
+ */
+OPAL_DECLSPEC int opal_util_refresh_stackhostname (void);
+
+
 #endif /* OPAL_STACKTRACE_H */

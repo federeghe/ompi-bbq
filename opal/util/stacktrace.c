@@ -412,6 +412,22 @@ char *opal_stackframe_output_string(void)
 
 #endif /* OPAL_WANT_PRETTY_PRINT_STACKTRACE */
 
+int opal_util_refresh_stackhostname(void) {
+    int i;
+
+    gethostname(stacktrace_hostname, sizeof(stacktrace_hostname));
+    stacktrace_hostname[sizeof(stacktrace_hostname) - 1] = '\0';
+    /* to keep these somewhat readable, only print the machine name */
+    for (i = 0 ; i < (int)sizeof(stacktrace_hostname) ; ++i) {
+        if (stacktrace_hostname[i] == '.') {
+            stacktrace_hostname[i] = '\0';
+            break;
+        }
+    }
+
+    return OPAL_SUCCESS;
+}
+
 /**
  * Here we register the show_stackframe function for signals
  * passed to OpenMPI by the mpi_signal-parameter passed to mpirun
@@ -428,18 +444,9 @@ int opal_util_register_stackhandlers (void)
     struct sigaction act, old;
     char * tmp;
     char * next;
-    int i;
     bool complain, showed_help = false;
 
-    gethostname(stacktrace_hostname, sizeof(stacktrace_hostname));
-    stacktrace_hostname[sizeof(stacktrace_hostname) - 1] = '\0';
-    /* to keep these somewhat readable, only print the machine name */
-    for (i = 0 ; i < (int)sizeof(stacktrace_hostname) ; ++i) {
-        if (stacktrace_hostname[i] == '.') {
-            stacktrace_hostname[i] = '\0';
-            break;
-        }
-    }
+    opal_util_refresh_stackhostname();
 
     memset(&act, 0, sizeof(act));
     act.sa_sigaction = show_stackframe;
