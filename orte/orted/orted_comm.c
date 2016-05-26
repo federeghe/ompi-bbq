@@ -1172,11 +1172,16 @@ void orte_daemon_recv(int status, orte_process_name_t* sender,
 
         mig_status = ORTE_DAEMON_MIG_PREPARE;   // Abuse of constant
 
+        char *cleaned_src_host = strchr(mig_src_host, '@');
+        cleaned_src_host = cleaned_src_host == NULL ? mig_src_host : cleaned_src_host + 1;
+        char *cleaned_dst_host = strchr(mig_dest_host, '@');
+        cleaned_dst_host = cleaned_dst_host == NULL ? mig_dest_host : cleaned_dst_host + 1;
+
         /* Create the file with source/destination to be read by my children */
         char filename[30];
         sprintf(filename,"/tmp/orted_mig_nodes_%i", getpid());
         FILE *f = fopen(filename,"w");
-        fprintf(f, "%u %u %s %s",mig_src_p.jobid,mig_src_p.vpid,mig_src_host,mig_dest_host);
+        fprintf(f, "%u %u %s %s",mig_src_p.jobid,mig_src_p.vpid,cleaned_src_host,cleaned_dst_host);
         fclose(f);
 
 
@@ -1309,7 +1314,7 @@ static void orted_mig_restore_sig(int sig) {
         if (NULL == (waiting_child=opal_pointer_array_get_item(orte_local_children, i))) {
             continue;
         }
-
+        curr_wait_child = i;
         found=true;
         break;
     }
@@ -1370,6 +1375,8 @@ static void orted_mig_child_ack_sig(int sig) {
             case ORTE_DAEMON_MIG_DONE:
                 // Ehy HNP, I'm alive!
                 SEND_MIG_ACK(ORTE_MIG_DONE_FLAG);
+                opal_output(0, "%s orted: DONE_ACK sent to HNP", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
             break;
             default:
                 ;
@@ -1423,6 +1430,7 @@ void orted_mig_callback(int status, orte_process_name_t *peer,
                     exit(0);
                 }
             }
+            sleep(5);
         }
     }
 }
