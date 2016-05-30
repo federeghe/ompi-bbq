@@ -698,7 +698,8 @@ int mca_btl_tcp_proc_remove(mca_btl_tcp_proc_t* btl_proc, mca_btl_base_endpoint_
                 (btl_proc->proc_endpoint_count-i-1)*sizeof(mca_btl_base_endpoint_t*));
             if(--btl_proc->proc_endpoint_count == 0) {
                 OPAL_THREAD_UNLOCK(&btl_proc->proc_lock);
-                OBJ_RELEASE(btl_proc);
+// TODO: manage the assertion failed
+//                OBJ_RELEASE(btl_proc);
                 return OMPI_SUCCESS;
             }
             /* The endpoint_addr may still be NULL if this enpoint is
@@ -802,7 +803,7 @@ bool mca_btl_tcp_proc_tosocks(mca_btl_tcp_addr_t* proc_addr,
         break;
 #endif
     default:
-        opal_output( 0, "mca_btl_tcp_proc: unknown af_family received: %d\n",
+        opal_output( 0, "mca_btl_tcp_proc_tosocks: unknown af_family received: %d\n",
                      proc_addr->addr_family );
         return false;
     } 

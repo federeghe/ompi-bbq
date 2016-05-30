@@ -65,7 +65,7 @@ mca_btl_tcp_module_t mca_btl_tcp_module = {
         NULL, /* register error */
         mca_btl_tcp_ft_event,
 #if ORTE_ENABLE_MIGRATION
-        mca_btl_tcp_mig_event
+        mca_btl_tcp_mig_event,
 #endif
     }
 };
@@ -133,6 +133,13 @@ int mca_btl_tcp_add_procs( struct mca_btl_base_module_t* btl,
             continue;
         }
 
+#if ORTE_ENABLE_MIGRATION
+        // Not sure why the if is needed, probably there are duplicated of
+        // procs in the array.
+        if(((opal_list_item_t*)tcp_proc)->opal_list_item_refcount==0) {
+            opal_list_append(&tcp_btl->tcp_procs, (opal_list_item_t*)tcp_proc);
+        }
+#endif
         opal_bitmap_set_bit(reachable, i);
         OPAL_THREAD_UNLOCK(&tcp_proc->proc_lock);
         peers[i] = tcp_endpoint;
@@ -158,6 +165,9 @@ int mca_btl_tcp_del_procs(struct mca_btl_base_module_t* btl,
         mca_btl_tcp_endpoint_t* tcp_endpoint = endpoints[i];
         if(tcp_endpoint->endpoint_proc != mca_btl_tcp_proc_local()) {
             opal_list_remove_item(&tcp_btl->tcp_endpoints, (opal_list_item_t*)tcp_endpoint);
+#if ORTE_ENABLE_MIGRATION
+            opal_list_remove_item(&tcp_btl->tcp_procs, (opal_list_item_t*)tcp_endpoint->endpoint_proc);
+#endif
             OBJ_RELEASE(tcp_endpoint);
         }
         opal_progress_event_users_decrement();
@@ -375,10 +385,6 @@ int mca_btl_tcp_send( struct mca_btl_base_module_t* btl,
     char hostname[30];
     gethostname(hostname,30);
     
-    printf("++++++++ ENDPOINT DEBUGGING:\n");
-    printf("++++++++ endpoint hostname: %s, my hostname: %s\n", endpoint->endpoint_proc->proc_ompi->proc_hostname, hostname);
-    fflush(stdout);
-
     frag->btl = tcp_btl;
     frag->endpoint = endpoint;
     frag->rc = 0;

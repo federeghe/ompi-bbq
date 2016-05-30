@@ -83,6 +83,7 @@
 static int mca_btl_tcp_component_register(void);
 static int mca_btl_tcp_component_open(void);
 static int mca_btl_tcp_component_close(void);
+int mca_btl_tcp_component_exchange(void);
 
 static char *mca_btl_tcp_if_seq_string;
 
@@ -438,6 +439,7 @@ static int mca_btl_tcp_create(int if_kindex, const char* if_name)
             return OMPI_ERR_OUT_OF_RESOURCE;
         memcpy(btl, &mca_btl_tcp_module, sizeof(mca_btl_tcp_module));
         OBJ_CONSTRUCT(&btl->tcp_endpoints, opal_list_t);
+        OBJ_CONSTRUCT(&btl->tcp_procs, opal_list_t);
         mca_btl_tcp_component.tcp_btls[mca_btl_tcp_component.tcp_num_btls++] = btl;
 
         /* initialize the btl */
@@ -913,6 +915,7 @@ int mca_btl_tcp_component_exchange(void)
      size_t i = 0;
      size_t size = mca_btl_tcp_component.tcp_addr_count * 
                    mca_btl_tcp_component.tcp_num_links * sizeof(mca_btl_tcp_addr_t);
+
      /* adi@2007-04-12:
       *
       * We'll need to explain things a bit here:
@@ -982,7 +985,8 @@ int mca_btl_tcp_component_exchange(void)
 #endif
              } /* end of for opal_ifbegin() */
          } /* end of for tcp_num_btls */
-         rc =  ompi_modex_send(&mca_btl_tcp_component.super.btl_version, 
+
+         rc =  ompi_modex_send(&mca_btl_tcp_component.super.btl_version,
                                addrs, xfer_size);
          free(addrs);
      } /* end if */

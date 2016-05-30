@@ -68,6 +68,7 @@ void orte_grpcomm_base_modex(int fd, short args, void *cbdata)
 {
     orte_grpcomm_caddy_t *caddy = (orte_grpcomm_caddy_t*)cbdata;
     orte_grpcomm_collective_t *modex = caddy->op;
+
     int rc;
     orte_namelist_t *nm;
     opal_list_item_t *item;
@@ -75,7 +76,8 @@ void orte_grpcomm_base_modex(int fd, short args, void *cbdata)
     orte_grpcomm_collective_t *cptr;
     opal_scope_t scope;
 
-    OBJ_RELEASE(caddy);
+// TODO CHECK
+//    OBJ_RELEASE(caddy);
 
     OPAL_OUTPUT_VERBOSE((1, orte_grpcomm_base_framework.framework_output,
                          "%s grpcomm:base:modex: performing modex",
@@ -99,6 +101,7 @@ void orte_grpcomm_base_modex(int fd, short args, void *cbdata)
     }
 
     if (0 == opal_list_get_size(&modex->participants)) {
+
         /* record the collective */
         modex->next_cbdata = modex;
         opal_list_append(&orte_grpcomm_base.active_colls, &modex->super);
@@ -118,9 +121,11 @@ void orte_grpcomm_base_modex(int fd, short args, void *cbdata)
         nm = OBJ_NEW(orte_namelist_t);
         nm->name.jobid = ORTE_PROC_MY_NAME->jobid;
         nm->name.vpid = ORTE_VPID_WILDCARD;
+
         opal_list_append(&modex->participants, &nm->super);
         modex->next_cb = orte_grpcomm_base_store_modex;
     } else {
+
         /* see if the collective is already present - a race condition
          * exists where other participants may have already sent us their
          * contribution. This would place the collective on the global
@@ -161,6 +166,7 @@ void orte_grpcomm_base_modex(int fd, short args, void *cbdata)
             /* cleanup */
             OBJ_RELEASE(cptr);
         }
+
         /* now add the modex to the global list of active collectives */
         modex->next_cb = orte_grpcomm_base_store_modex;
         modex->next_cbdata = modex;
@@ -250,9 +256,9 @@ void orte_grpcomm_base_store_modex(opal_buffer_t *rbuf, void *cbdata)
                 goto cleanup;
             }
             OPAL_OUTPUT_VERBOSE((10, orte_grpcomm_base_framework.framework_output,
-                                 "%s STORING MODEX DATA FROM %s FOR %s",
+                                 "%s STORING MODEX DATA FROM %s FOR %s (size %i)",
                                  ORTE_NAME_PRINT(ORTE_PROC_MY_NAME),
-                                 ORTE_NAME_PRINT(&pname), kv->key));
+                                 ORTE_NAME_PRINT(&pname), kv->key, kv->data.bo.size));
             /* if this is me, dump the data - we already have it in the db */
             if (ORTE_PROC_MY_NAME->jobid == pname.jobid &&
                 ORTE_PROC_MY_NAME->vpid == pname.vpid) {
@@ -325,8 +331,8 @@ int orte_grpcomm_base_pack_modex_entries(opal_buffer_t *buf, opal_scope_t scope)
     /* if there are entries, store them */
     while (NULL != (kv = (opal_value_t*)opal_list_remove_first(&data))) {
         OPAL_OUTPUT_VERBOSE((5, orte_grpcomm_base_framework.framework_output,
-                             "%s grpcomm:base:pack_modex: packing entry for %s",
-                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), kv->key));
+                             "%s grpcomm:base:pack_modex: packing entry for %s (size %d)",
+                             ORTE_NAME_PRINT(ORTE_PROC_MY_NAME), kv->key, kv->data.bo.size));
         if (ORTE_SUCCESS != (rc = opal_dss.pack(buf, &kv, 1, OPAL_VALUE))) {
             ORTE_ERROR_LOG(rc);
             break;

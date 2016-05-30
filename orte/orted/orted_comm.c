@@ -1288,8 +1288,21 @@ static void orted_mig_restore_sig(int sig) {
         // ???
         return;
     }
+
+    freopen("/tmp/err","w", stderr);
+
+    freopen("/tmp/out","w", stdout);
+
+    // Reopen the debugging file descriptor
+    opal_output_reopen(0, NULL);
     
     opal_output(0, "%s orted: MIG RESTORE SIG", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+
+
+
+    fprintf(stdout,"%s orted: MIG RESTORE SIG\n", ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+    fflush(stdout);
+
 
     // Restore the original signal handler for USR2
     signal(SIGUSR2, prev_handler_2);
@@ -1430,7 +1443,6 @@ void orted_mig_callback(int status, orte_process_name_t *peer,
                     exit(0);
                 }
             }
-            sleep(5);
         }
     }
 }

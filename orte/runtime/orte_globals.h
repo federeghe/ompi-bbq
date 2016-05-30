@@ -415,6 +415,9 @@ typedef struct {
     orte_grpcomm_coll_id_t peer_modex;
     orte_grpcomm_coll_id_t peer_init_barrier;
     orte_grpcomm_coll_id_t peer_fini_barrier;
+#if ORTE_ENABLE_MIGRATION
+    orte_grpcomm_coll_id_t peer_mig_modex;
+#endif
     /* total slots allocated to this job */
     orte_std_cntr_t total_slots_alloc;
     /* number of procs in this job */

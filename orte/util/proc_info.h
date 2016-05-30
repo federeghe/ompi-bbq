@@ -129,6 +129,9 @@ struct orte_proc_info_t {
     orte_grpcomm_coll_id_t peer_modex;   /**< modex collective id */
     orte_grpcomm_coll_id_t peer_init_barrier;   /**< barrier id during init */
     orte_grpcomm_coll_id_t peer_fini_barrier;   /**< barrier id during finalize */
+#if ORTE_ENABLE_MIGRATION
+    orte_grpcomm_coll_id_t peer_mig_modex;   /**< modex collective id after migration */
+#endif
     orte_vpid_t my_hostid;               /** identifies the local host for a coprocessor */
 };
 typedef struct orte_proc_info_t orte_proc_info_t;

@@ -278,6 +278,12 @@ int orte_odls_base_default_get_add_procs_data(opal_buffer_t *data,
         ORTE_ERROR_LOG(rc);
         return rc;
     }
+#if ORTE_ENABLE_MIGRATION
+    if (ORTE_SUCCESS != (rc = opal_dss.pack(data, &jdata->peer_mig_modex, 1, ORTE_GRPCOMM_COLL_ID_T))) {
+        ORTE_ERROR_LOG(rc);
+        return rc;
+    }
+#endif
 
     return ORTE_SUCCESS;
 }
@@ -560,6 +566,12 @@ int orte_odls_base_default_construct_child_list(opal_buffer_t *data,
         ORTE_ERROR_LOG(rc);
         return rc;
     }
+    cnt=1;
+    if (ORTE_SUCCESS != (rc = opal_dss.unpack(data, &jdata->peer_mig_modex, &cnt, ORTE_GRPCOMM_COLL_ID_T))) {
+        ORTE_ERROR_LOG(rc);
+        return rc;
+    }
+
 
     /* check the procs */
     for (n=0; n < jdata->procs->size; n++) {
@@ -596,7 +608,14 @@ int orte_odls_base_default_construct_child_list(opal_buffer_t *data,
     nm->name.jobid = jdata->jobid;
     nm->name.vpid = ORTE_VPID_WILDCARD;
     opal_list_append(&coll->participants, &nm->super);
-    
+
+#if ORTE_ENABLE_MIGRATION
+    coll = orte_grpcomm_base_setup_collective(jdata->peer_mig_modex);
+    nm = OBJ_NEW(orte_namelist_t);
+    nm->name.jobid = jdata->jobid;
+    nm->name.vpid = ORTE_VPID_WILDCARD;
+    opal_list_append(&coll->participants, &nm->super);
+#endif
     /* progress any pending collectives */
     orte_grpcomm_base_progress_collectives();
     

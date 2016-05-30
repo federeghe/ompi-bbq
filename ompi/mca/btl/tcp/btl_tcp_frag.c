@@ -124,6 +124,11 @@ bool mca_btl_tcp_frag_send(mca_btl_tcp_frag_t* frag, int sd)
     while(cnt < 0) {
         cnt = writev(sd, frag->iov_ptr, frag->iov_cnt);
         if(cnt < 0) {
+#if ORTE_ENABLE_MIGRATION
+            if (MCA_BTL_TCP_FROZEN == frag->endpoint->endpoint_state) {
+                return false;
+            }
+#endif
             switch(opal_socket_errno) {
             case EINTR:
                 continue;
@@ -215,7 +220,10 @@ bool mca_btl_tcp_frag_recv(mca_btl_tcp_frag_t* frag, int sd)
         cnt = readv(sd, frag->iov_ptr, num_vecs);
 	if( 0 < cnt ) goto advance_iov_position;
 	if( cnt == 0 ) {
-            btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
+        if (MCA_BTL_TCP_FROZEN == btl_endpoint->endpoint_state) {
+            return false;
+        }
+        btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
 	    mca_btl_tcp_endpoint_close(btl_endpoint);
 	    return false;
 	}

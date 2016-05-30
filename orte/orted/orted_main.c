@@ -611,6 +611,15 @@ int orte_daemon(int argc, char *argv[])
         nm->name.vpid = ORTE_VPID_WILDCARD;
         opal_list_append(&coll->participants, &nm->super);
 
+#if ORTE_ENABLE_MIGRATION
+        jdata->peer_mig_modex = orte_grpcomm_base_get_coll_id();
+        coll = orte_grpcomm_base_setup_collective(jdata->peer_mig_modex);
+        nm = OBJ_NEW(orte_namelist_t);
+        nm->name.jobid = jdata->jobid;
+        nm->name.vpid = ORTE_VPID_WILDCARD;
+        opal_list_append(&coll->participants, &nm->super);
+#endif
+
         /* need to setup a pidmap for it */
         if (ORTE_SUCCESS != (ret = orte_util_encode_pidmap(&orte_pidmap, false))) {
             ORTE_ERROR_LOG(ret);

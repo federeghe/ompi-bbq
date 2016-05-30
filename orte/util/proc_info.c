@@ -90,6 +90,8 @@ static int orte_ess_node_rank;
 static int orte_peer_modex_id;
 static int orte_peer_init_barrier_id;
 static int orte_peer_fini_barrier_id;
+static int orte_peer_mig_modex_id;
+
 static char *orte_strip_prefix;
 
 int orte_proc_info(void)
@@ -285,6 +287,16 @@ int orte_proc_info(void)
                                   MCA_BASE_VAR_SCOPE_CONSTANT,
                                   &orte_peer_fini_barrier_id);
     orte_process_info.peer_fini_barrier = (orte_grpcomm_coll_id_t) orte_peer_fini_barrier_id;
+
+    orte_peer_mig_modex_id = -1;
+    (void) mca_base_var_register ("orte", "orte", NULL, "peer_mig_modex_id", "Peer migration collective id",
+                                  MCA_BASE_VAR_TYPE_INT, NULL, 0,
+                                  MCA_BASE_VAR_FLAG_INTERNAL,
+                                  OPAL_INFO_LVL_9,
+                                  MCA_BASE_VAR_SCOPE_CONSTANT,
+                                  &orte_peer_mig_modex_id);
+    orte_process_info.peer_mig_modex = (orte_grpcomm_coll_id_t) orte_peer_mig_modex_id;
+
 
     return ORTE_SUCCESS;
 }

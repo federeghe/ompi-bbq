@@ -268,6 +268,9 @@ void orte_plm_base_setup_job(int fd, short args, void *cbdata)
     char *modx_par, *modx_val;
     char *bar1_par, *bar1_val;
     char *bar2_par, *bar2_val;
+#if ORTE_ENABLE_MIGRATION
+    char *bar3_par, *bar3_val;
+#endif
 
     OPAL_OUTPUT_VERBOSE((5, orte_plm_base_framework.framework_output,
                          "%s plm:base:setup_job",
@@ -312,6 +315,10 @@ void orte_plm_base_setup_job(int fd, short args, void *cbdata)
     caddy->jdata->peer_fini_barrier = orte_grpcomm_base_get_coll_id();
     (void) mca_base_var_env_name ("orte_peer_fini_barrier_id", &bar2_par);
     asprintf(&bar2_val, "%d", caddy->jdata->peer_fini_barrier);
+    caddy->jdata->peer_mig_modex = orte_grpcomm_base_get_coll_id();
+    (void) mca_base_var_env_name ("orte_peer_mig_modex_id", &bar3_par);
+    asprintf(&bar3_val, "%d", caddy->jdata->peer_mig_modex);
+
 
     /* if app recovery is not defined, set apps to defaults */
     for (i=0; i < caddy->jdata->apps->size; i++) {
@@ -325,6 +332,7 @@ void orte_plm_base_setup_job(int fd, short args, void *cbdata)
         opal_setenv(modx_par, modx_val, true, &app->env);
         opal_setenv(bar1_par, bar1_val, true, &app->env);
         opal_setenv(bar2_par, bar2_val, true, &app->env);
+        opal_setenv(bar3_par, bar3_val, true, &app->env);
     }
     free(modx_par);
     free(modx_val);
@@ -332,6 +340,8 @@ void orte_plm_base_setup_job(int fd, short args, void *cbdata)
     free(bar1_val);
     free(bar2_par);
     free(bar2_val);
+    free(bar3_par);
+    free(bar3_val);
 
     /* set the job state to the next position */
     ORTE_ACTIVATE_JOB_STATE(caddy->jdata, ORTE_JOB_STATE_INIT_COMPLETE);

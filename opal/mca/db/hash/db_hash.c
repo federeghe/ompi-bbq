@@ -457,6 +457,7 @@ static int fetch(const opal_identifier_t *uid,
             return OPAL_ERR_TYPE_MISMATCH;
         }
         boptr = (opal_byte_object_t*)malloc(sizeof(opal_byte_object_t));
+
         if (NULL != kv->data.bo.bytes && 0 < kv->data.bo.size) {
             boptr->bytes = (uint8_t *) malloc(kv->data.bo.size);
             memcpy(boptr->bytes, kv->data.bo.bytes, kv->data.bo.size);

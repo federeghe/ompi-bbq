@@ -123,6 +123,9 @@ struct mca_btl_tcp_module_t {
     size_t tcp_bytes_recv;
     size_t tcp_send_handler;
 #endif
+#if ORTE_ENABLE_MIGRATION
+    opal_list_t         tcp_procs;
+#endif
 }; 
 typedef struct mca_btl_tcp_module_t mca_btl_tcp_module_t;
 extern mca_btl_tcp_module_t mca_btl_tcp_module;
