@@ -185,7 +185,7 @@ mca_pml_ob1_match_completion_free( struct mca_btl_base_module_t* btl,
     /* check completion status */
     if( OPAL_UNLIKELY(OMPI_SUCCESS != status) ) {
         /* TSW - FIX */
-        opal_output(0, "%s:%d FATAL", __FILE__, __LINE__);
+        opal_output(0, "%s:%d FATAL with status %d", __FILE__, __LINE__, status);
         ompi_rte_abort(-1, NULL);
     }
     mca_pml_ob1_match_completion_free_request( bml_btl, sendreq );

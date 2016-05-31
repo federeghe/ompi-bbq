@@ -83,6 +83,8 @@ static int opal_if_base_close(void)
     }
     OBJ_DESTRUCT(&opal_if_list);
 
+    frameopen = false;
+
     return mca_base_framework_components_close(&opal_if_base_framework, NULL);
 }
 

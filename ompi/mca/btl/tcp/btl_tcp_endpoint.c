@@ -126,7 +126,7 @@ static void mca_btl_tcp_endpoint_send_handler(int sd, short flags, void* user);
  * Diagnostics: change this to "1" to enable the function
  * mca_btl_tcp_endpoint_dump(), below
  */
-#define WANT_PEER_DUMP 0
+#define WANT_PEER_DUMP 1
 /*
  * diagnostics
  */
@@ -356,8 +356,9 @@ int mca_btl_tcp_endpoint_send(mca_btl_base_endpoint_t* btl_endpoint, mca_btl_tcp
 #endif
         opal_list_append(&btl_endpoint->endpoint_frags, (opal_list_item_t*)frag);
         frag->base.des_flags |= MCA_BTL_DES_SEND_ALWAYS_CALLBACK;
-        if(btl_endpoint->endpoint_state == MCA_BTL_TCP_CLOSED)
+        if(btl_endpoint->endpoint_state == MCA_BTL_TCP_CLOSED) {
             rc = mca_btl_tcp_endpoint_start_connect(btl_endpoint);
+        }
         break;
     case MCA_BTL_TCP_FAILED:
         rc = OMPI_ERR_UNREACH;
@@ -409,9 +410,9 @@ mca_btl_tcp_endpoint_send_blocking(mca_btl_base_endpoint_t* btl_endpoint,
         int retval = send(btl_endpoint->endpoint_sd, (const char *)ptr+cnt, size-cnt, 0);
         if(retval < 0) {
             if(opal_socket_errno != EINTR && opal_socket_errno != EAGAIN && opal_socket_errno != EWOULDBLOCK) {
-                BTL_ERROR(("send(%d, %p, %lu/%lu) failed: %s (%d)",
+                opal_output(0, "mca_btl_tcp_endpoint_send_blocking(%d, %p, %lu/%lu) failed: %s (%d)",
                            btl_endpoint->endpoint_sd, data, cnt, size,
-                           strerror(opal_socket_errno), opal_socket_errno));
+                           strerror(opal_socket_errno), opal_socket_errno);
                 btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
                 mca_btl_tcp_endpoint_close(btl_endpoint);
                 return -1;
@@ -618,8 +619,8 @@ static int mca_btl_tcp_endpoint_recv_blocking(mca_btl_base_endpoint_t* btl_endpo
         /* socket is non-blocking so handle errors */
         if(retval < 0) {
             if(opal_socket_errno != EINTR && opal_socket_errno != EAGAIN && opal_socket_errno != EWOULDBLOCK) {
-                BTL_ERROR(("recv(%d, %lu/%lu) failed: %s (%d)",
-                           btl_endpoint->endpoint_sd, cnt, size, strerror(opal_socket_errno), opal_socket_errno));
+                opal_output(0, "mca_btl_tcp_endpoint_recv_blocking(%d, %lu/%lu) failed: %s (%d)",
+                            btl_endpoint->endpoint_sd, cnt, size, strerror(opal_socket_errno), opal_socket_errno);
                 btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
                 mca_btl_tcp_endpoint_close(btl_endpoint);
                 return -1;
@@ -809,11 +810,15 @@ int mca_btl_tcp_endpoint_start_connect(mca_btl_base_endpoint_t* btl_endpoint)
  */
 static void mca_btl_tcp_endpoint_complete_connect(mca_btl_base_endpoint_t* btl_endpoint)
 {
+    // TODO REMOVE ME
+
     int so_error = 0;
     opal_socklen_t so_length = sizeof(so_error);
     struct sockaddr_storage endpoint_addr;
 
     mca_btl_tcp_proc_tosocks(btl_endpoint->endpoint_addr, &endpoint_addr);
+
+    opal_output(0, "Complete connect to %s", opal_net_get_hostname((struct sockaddr*) &endpoint_addr));
 
     /* check connect completion status */
     if(getsockopt(btl_endpoint->endpoint_sd, SOL_SOCKET, SO_ERROR, (char *)&so_error, &so_length) < 0) {

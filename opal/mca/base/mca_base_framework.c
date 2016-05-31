@@ -128,7 +128,6 @@ int mca_base_framework_register (struct mca_base_framework_t *framework,
 int mca_base_framework_open (struct mca_base_framework_t *framework,
                              mca_base_open_flag_t flags) {
     int ret;
-
     assert (NULL != framework);
 
     /* register this framework before opening it */
@@ -154,7 +153,6 @@ int mca_base_framework_open (struct mca_base_framework_t *framework,
 
     /* check the verbosity level and open (or close) the output */
     framework_open_output (framework);
-    
     
     if (NULL != framework->framework_open) {
         ret = framework->framework_open (flags);

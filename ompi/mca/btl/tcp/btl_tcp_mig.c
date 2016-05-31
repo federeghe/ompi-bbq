@@ -7,7 +7,7 @@
 
 #include "ompi/proc/proc.h"
 #include "opal/mca/db/db.h"
-#include "opal/frameworks.h"
+#include "opal/mca/if/base/base.h"
 #include "opal/util/net.h"
 #include "orte/mca/grpcomm/base/base.h"
 
@@ -15,8 +15,8 @@
 static void mca_btl_tcp_mig_prepare(struct mca_btl_base_module_t* btl, mca_btl_base_mig_info_t* mig_info);
 static void mca_btl_tcp_mig_exec(struct mca_btl_base_module_t* btl, mca_btl_base_mig_info_t* mig_info);
 static int  mca_btl_tcp_mig_restore(struct mca_btl_base_module_t* btl, mca_btl_base_mig_info_t* mig_info);
-/*static*/ int  mca_btl_tcp_mig_refresh_addrs(mca_btl_tcp_proc_t* proc);
-/*static*/ void mca_btl_tcp_mig_restore_aft_modex(opal_buffer_t *data, void *cbdata);
+static int  mca_btl_tcp_mig_refresh_addrs(mca_btl_tcp_proc_t* proc);
+static void mca_btl_tcp_mig_restore_aft_modex(opal_buffer_t *data, void *cbdata);
 
 bool mca_btl_tcp_mig_is_ep_migrating(mca_btl_base_endpoint_t *endpoint);
 void mca_btl_tcp_mig_freeze_endpoint(mca_btl_base_endpoint_t *endpoint);
@@ -32,9 +32,6 @@ ompi_rte_collective_t* mca_btl_tcp_mig_modex_coll = NULL;
 int mca_btl_tcp_mig_event(struct mca_btl_base_module_t* btl,
                                  mca_btl_base_mig_status_t mig_status,
                                  mca_btl_base_mig_info_t* mig_info) {
-
-
-    (void) opal_frameworks; // Anti-warning
 
     switch(mig_status) {
 
@@ -59,7 +56,15 @@ int mca_btl_tcp_mig_event(struct mca_btl_base_module_t* btl,
                                     ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
 
                 // If I am the migrating node, just update my interfaces information
-                mca_base_framework_close(&opal_if_base_framework);
+                while (opal_if_base_framework.framework_refcnt > 0) {
+                    // I have to close all instances across Open MPI
+                    if (OPAL_UNLIKELY(OMPI_SUCCESS != mca_base_framework_close(&opal_if_base_framework))) {
+                        opal_output_verbose(0, ompi_btl_base_framework.framework_output,
+                                            "%s btl:tcp: Unable to close the IF framework (ignoring).",
+                                            ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+                        break;
+                    }
+                }
                 mca_base_framework_open(&opal_if_base_framework, 0);
                 // And send to all node via the modex interface
                 mca_btl_tcp_component_exchange();
@@ -158,26 +163,9 @@ static int mca_btl_tcp_mig_restore(struct mca_btl_base_module_t* btl, mca_btl_ba
     }
 
     return OMPI_SUCCESS;
-// Priorita' da uare per l'evento: ORTE_SYS_PRI
-
-/*
-        for (unsigned int i=0; i<proc->proc_endpoint_count; i++) {
-            // For all frozen endpoint, set it to closed, so
-            // if someone want to send it has to open a new connection
-            // as if it was never opened.
-            proc->proc_endpoints[i]->endpoint_state = MCA_BTL_TCP_CLOSED;
-
-            if(opal_list_get_size(&proc->proc_endpoints[i]->endpoint_frags) > 0 || proc->proc_endpoints[i]->endpoint_send_frag != NULL) {
-                // But, if the endpoint has some frags to send, connect immediately.
-                mca_btl_tcp_endpoint_start_connect(proc->proc_endpoints[i]);
-            }
-        }
-        */
-
-    return OMPI_SUCCESS;
 }
 
-/*static*/ void mca_btl_tcp_mig_restore_aft_modex(opal_buffer_t *data, void *cbdata) {
+static void mca_btl_tcp_mig_restore_aft_modex(opal_buffer_t *data, void *cbdata) {
 
     int rc;
     mca_btl_tcp_proc_t *proc, *next;
@@ -205,9 +193,6 @@ static int mca_btl_tcp_mig_restore(struct mca_btl_base_module_t* btl, mca_btl_ba
             // If I'm not the migrating node, I have to update my
             // database of interfaces of remote nodes.
 
-            opal_output_verbose(50,ompi_btl_base_framework.framework_output,
-                                "btl:tcp: mca_btl_tcp_mig_restore_aft_modex() R START");
-
             rc = mca_btl_tcp_mig_refresh_addrs(proc);
             if (OPAL_UNLIKELY(OMPI_SUCCESS != rc)) {
                 opal_output_verbose(50,ompi_btl_base_framework.framework_output,
@@ -215,20 +200,27 @@ static int mca_btl_tcp_mig_restore(struct mca_btl_base_module_t* btl, mca_btl_ba
 
                 return;
             }
-            opal_output_verbose(50,ompi_btl_base_framework.framework_output,
-                                "btl:tcp: mca_btl_tcp_mig_restore_aft_modex() R END");
 
         }
-    }
 
-    opal_output_verbose(50,ompi_btl_base_framework.framework_output,
-                        "btl:tcp: mca_btl_tcp_mig_restore_aft_modex() - END");
+        for (unsigned int i=0; i<proc->proc_endpoint_count; i++) {
+            // For all frozen endpoint, set it to closed, so
+            // if someone want to send it has to open a new connection
+            // as if it was never opened.
+            proc->proc_endpoints[i]->endpoint_state = MCA_BTL_TCP_CLOSED;
+
+            if(opal_list_get_size(&proc->proc_endpoints[i]->endpoint_frags) > 0 || proc->proc_endpoints[i]->endpoint_send_frag != NULL) {
+                // But, if the endpoint has some frags to send, connect immediately.
+                mca_btl_tcp_endpoint_start_connect(proc->proc_endpoints[i]);
+            }
+        }
+    }
 
 
 }
 
 
-/* static */ int mca_btl_tcp_mig_refresh_addrs(mca_btl_tcp_proc_t* proc) {
+static  int mca_btl_tcp_mig_refresh_addrs(mca_btl_tcp_proc_t* proc) {
 
     unsigned int i;
     int rc;
@@ -276,23 +268,18 @@ static int mca_btl_tcp_mig_restore(struct mca_btl_base_module_t* btl, mca_btl_ba
 #endif
     }
 
-    opal_output_verbose(50, ompi_btl_base_framework.framework_output,
-                            "btl: tcp: mca_btl_tcp_mig_refresh_addrs AFTER FOR");
-
     // Now I have to transfer the cache and waiting packets
     // to new endpoints
     for (i=0; i<proc->proc_endpoint_count; i++) {
-        // free(proc->proc_endpoints[i]->endpoint_proc->proc_addrs);
+        free(proc->proc_endpoints[i]->endpoint_proc->proc_addrs);
         proc->proc_addrs      = new_addresses;
         proc->proc_addr_count = size;
-        proc->proc_endpoints[i]->endpoint_proc->proc_addrs      = new_addresses;
-        proc->proc_endpoints[i]->endpoint_proc->proc_addr_count = size;
+        proc->proc_endpoints[i]->endpoint_addr = new_addresses;
 
         // TODO: manage multiple endpoints
         break; // proc->proc_endpoint_count should be 1
     }
 
-    new_addresses->addr_family = AF_INET;
     mca_btl_tcp_proc_tosocks(new_addresses, &sockaddr);
     opal_output_verbose(50, ompi_btl_base_framework.framework_output,
                         "btl: tcp: mca_btl_tcp_mig_restore: AFTERFOR proc %s, endpoint new addr %s on port %d",
@@ -300,8 +287,6 @@ static int mca_btl_tcp_mig_restore(struct mca_btl_base_module_t* btl, mca_btl_ba
                         opal_net_get_hostname((struct sockaddr*) &(sockaddr)),
                         ntohs(proc->proc_endpoints[0]->endpoint_addr->addr_port));
 
-    opal_output_verbose(50, ompi_btl_base_framework.framework_output,
-                            "btl: tcp: mca_btl_tcp_mig_refresh_addrs END");
 
     return OMPI_SUCCESS;
 }
@@ -356,6 +341,10 @@ void mca_btl_tcp_mig_freeze_endpoint(mca_btl_base_endpoint_t *endpoint) {
 
 void mca_btl_tcp_mig_close_endpoint(mca_btl_base_endpoint_t *endpoint) {
     // Close the socket
+
+    opal_event_del(&endpoint->endpoint_recv_event);
+    opal_event_del(&endpoint->endpoint_send_event);
+    shutdown(endpoint->endpoint_sd, SHUT_RD);
     close(endpoint->endpoint_sd);
     endpoint->endpoint_sd = -1;
 
