@@ -207,7 +207,7 @@ static void mca_btl_tcp_mig_restore_aft_modex(opal_buffer_t *data, void *cbdata)
             // For all frozen endpoint, set it to closed, so
             // if someone want to send it has to open a new connection
             // as if it was never opened.
-            proc->proc_endpoints[i]->endpoint_state = MCA_BTL_TCP_CLOSED;
+            proc->proc_endpoints[i]->endpoint_state = MCA_BTL_TCP_CLOSED;            
 
             if(opal_list_get_size(&proc->proc_endpoints[i]->endpoint_frags) > 0 || proc->proc_endpoints[i]->endpoint_send_frag != NULL) {
                 // But, if the endpoint has some frags to send, connect immediately.
@@ -253,7 +253,14 @@ static  int mca_btl_tcp_mig_refresh_addrs(mca_btl_tcp_proc_t* proc) {
                         "btl: tcp: mca_btl_tcp_mig_restore: STARTFOR proc %s, endpoint old addr %s on port %d",
                         OMPI_NAME_PRINT(&proc->proc_ompi->proc_name),
                         opal_net_get_hostname((struct sockaddr*) &(sockaddr)),
-                        ntohs(proc->proc_endpoints[0]->endpoint_addr->addr_port));
+                        ntohs(proc->proc_endpoints[0]->endpoint_addr->addr_port)
+    );
+    opal_output_verbose(50, ompi_btl_base_framework.framework_output,
+                        "btl: tcp: mca_btl_tcp_mig_restore: Previous endpoint has #nfrags=%lu,sfrag=%d,rfrag=%d",
+                        opal_list_get_size(&proc->proc_endpoints[0]->endpoint_frags),
+                        proc->proc_endpoints[0]->endpoint_send_frag != NULL,
+                        proc->proc_endpoints[0]->endpoint_recv_frag != NULL
+    );
 
     // Forall new addresses we have to convert the OMPi family
     // to the standard linux one

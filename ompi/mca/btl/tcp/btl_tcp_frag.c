@@ -225,9 +225,15 @@ bool mca_btl_tcp_frag_recv(mca_btl_tcp_frag_t* frag, int sd)
     }
 
     if( cnt == 0 ) {
-        btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
-	    mca_btl_tcp_endpoint_close(btl_endpoint);
-	    return false;
+        // If the other side close in a clean way the communication maybe it is because
+        // a migration is in progress and the other side close the send side of the socket.
+        // In that case just continue without errors.
+        return false;
+
+// TODO Restore the fault detection
+//        btl_endpoint->endpoint_state = MCA_BTL_TCP_FAILED;
+//	    mca_btl_tcp_endpoint_close(btl_endpoint);
+//	    return false;
 	}
 
 	switch(opal_socket_errno) {
