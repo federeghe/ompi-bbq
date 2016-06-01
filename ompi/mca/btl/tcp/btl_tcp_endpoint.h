@@ -25,7 +25,7 @@
 #include "btl_tcp.h"
 BEGIN_C_DECLS
 
-#define MCA_BTL_TCP_ENDPOINT_CACHE 0
+#define MCA_BTL_TCP_ENDPOINT_CACHE 1
 
 /**
  * State of TCP endpoint connection.
